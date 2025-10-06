@@ -1,2 +1,2 @@
 # esperanza_system
-Health Center Patient Portal and Vital Signs Monitoring System
+Biometric Access Kiosk for Patient Record Management with Vital Sign and Queueing System Integration - Esperanza Health Center
