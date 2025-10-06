@@ -29,35 +29,14 @@ class PatientViewSet(viewsets.ModelViewSet):
         
     def get_queryset(self): # Search Filters !!!! 
         queryset = Patient.objects.all()
-        
-        # Exact name search
-        if self.request.query_params.get('name'):
-            queryset = queryset.filter(name=self.request.query_params.get('name'))
-        
-        # Partial name search
-        if self.request.query_params.get('search_name'):
-            queryset = queryset.filter(name__icontains=self.request.query_params.get('search_name'))
-        
-        patient_id = self.request.query_params.get('patient_id')
-        if patient_id:
-            queryset = queryset.filter(patient_id__icontains=patient_id)
-        
-        # Address search
-        if self.request.query_params.get('address'):
-            queryset = queryset.filter(address__icontains=self.request.query_params.get('address'))
-            
-        if self.request.query_params.get('username'):
-            queryset = queryset.filter(username__icontains=self.request.query_params.get('username'))
-        
-        # # City search
-        # if self.request.query_params.get('city'):
-        #     queryset = queryset.filter(city__iexact=self.request.query_params.get('address'))
-        
+
         # General search (name OR address)
         if self.request.query_params.get('search'):
             search_term = self.request.query_params.get('search')
             queryset = queryset.filter(
-                Q(name__icontains=search_term) | Q(address__icontains=search_term)
+                Q(name__icontains=search_term) | 
+                Q(address__icontains=search_term) | 
+                Q(patient_id__icontains=search_term) 
             )
         return queryset
          
