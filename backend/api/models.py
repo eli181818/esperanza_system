@@ -10,7 +10,7 @@ class HCStaff(models.Model):
 class Patient(models.Model):    
     patient_id = models.CharField(max_length=20, unique=True)
     first_name = models.CharField(max_length=100)
-    middle_name = models.CharField(max_length=100, null=True, blank=True)
+    middle_initial = models.CharField(max_length=100, null=True, blank=True)
     last_name = models.CharField(max_length=100)
     age = models.IntegerField(null=True, blank=True)
     gender = models.CharField(max_length=6, choices=[('Male', 'Male'), ('Female', 'Female')])
