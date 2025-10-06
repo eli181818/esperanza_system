@@ -50,13 +50,19 @@ const nav = useNavigate();
   
       const patientData = JSON.parse(authenticatedPatient)
       console.log('Loaded authenticated patient data:', patientData);
+
+      const calculatedAge = calcAge(patientData.birthdate);
      
       setProfile({
-        name: patientData.name,
+        first_name: patientData.first_name,
+        last_name: patientData.last_name,
+        middle_initial: patientData.middle_initial,
+        name: `${patientData.first_name}${patientData.middle_initial ? ' ' + patientData.middle_initial + '.' : ''} ${patientData.last_name}`, 
+        // name: `${patientData.first_name} ${patientData.last_name}`, 
         patientId: patientData.patient_id,
         contact: patientData.contact,
         dob: patientData.birthdate,
-        age: patientData.age
+        age: calculatedAge
       })
     
       setLatest({

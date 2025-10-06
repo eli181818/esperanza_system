@@ -34,7 +34,8 @@ class PatientViewSet(viewsets.ModelViewSet):
         if self.request.query_params.get('search'):
             search_term = self.request.query_params.get('search')
             queryset = queryset.filter(
-                Q(name__icontains=search_term) | 
+                Q(first_name__icontains=search_term) | 
+                Q(last_name__icontains=search_term) | 
                 Q(address__icontains=search_term) | 
                 Q(patient_id__icontains=search_term) 
             )
@@ -177,7 +178,8 @@ def login(request):
             patient = Patient.objects.get(username=username.strip(), pin=pin)
             return Response({
                 "id": patient.id,
-                "name": patient.name,
+                "first_name": patient.first_name,
+                "last_name": patient.last_name,
                 "role": "patient",
                 "patient": PatientSerializer(patient).data
             })
