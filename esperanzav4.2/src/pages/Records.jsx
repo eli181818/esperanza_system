@@ -94,7 +94,6 @@ const nav = useNavigate();
 
 const printLatest = () => window.print()
 
-// --- LOADING UI (from Records1.jsx) ---
 if (loading) {
   return (
     <div className="flex items-center justify-center min-h-screen">
@@ -106,7 +105,6 @@ if (loading) {
   )
 }
 
-// --- ERROR UI (from Records1.jsx) ---
 if (!profile) {
   return (
     <div className="flex items-center justify-center min-h-screen">

@@ -27,10 +27,10 @@ class PatientViewSet(viewsets.ModelViewSet):
         except Patient.DoesNotExist:
             return Response({"error": "Patient not found"}, status=status.HTTP_404_NOT_FOUND)
         
-    def get_queryset(self): # Search Filters !!!! 
+    def get_queryset(self): 
         queryset = Patient.objects.all()
 
-        # General search (name OR address)
+        # General search filter
         if self.request.query_params.get('search'):
             search_term = self.request.query_params.get('search')
             queryset = queryset.filter(
