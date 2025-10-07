@@ -20,6 +20,7 @@ export default function LoginAuth() {
   const [username, setUsername] = useState('')    // only used for patients
   const [isAuthenticating, setIsAuthenticating] = useState(false)
   
+
   // // Load saved patient profile from localStorage (placeholder for real auth)
   // const savedPatient = useMemo(() => {
   //   try { return JSON.parse(localStorage.getItem('patientProfile') || 'null') || null }
@@ -108,6 +109,7 @@ export default function LoginAuth() {
     }
   }
 
+  // const onFpDone = () => completeLogin()
   const onFpDone = () => {
     if (role === 'staff') nav('/staff')
     else nav('/portal')

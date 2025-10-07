@@ -1,7 +1,7 @@
 // Records.jsx
 // Page for patients to DISPLAY patient records and vitals
 
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import heartRateIcon from '../assets/heart-rate.png'
 import temperatureIcon from '../assets/thermometer.png'
 import spo2Icon from '../assets/oxygen-saturation.png'
@@ -9,9 +9,7 @@ import heightIcon from '../assets/height.png'
 import weightIcon from '../assets/weight.png'
 import bmiIcon from '../assets/body-mass-index.png'
 import printIcon from '../assets/printer.png'
-import logoutIcon from '../assets/logout.png'
-import { useNavigate } from 'react-router-dom'
-
+import logoutIcon from '../assets/logout.png'  
 
 export default function Records() {
 const [profile, setProfile] = useState(null);
@@ -24,6 +22,7 @@ const nav = useNavigate();
     if (!dobStr) return null
     const dob = new Date(dobStr)
     if (Number.isNaN(dob.getTime())) return null
+    
     const t = new Date()
     let age = t.getFullYear() - dob.getFullYear()
     const m = t.getMonth() - dob.getMonth()
@@ -38,7 +37,7 @@ const nav = useNavigate();
       .slice(0, 2)
       .map(s => s[0]?.toUpperCase())
       .join('') || 'PT'
-
+  
   useEffect(() => { // Fetch patient data on component mount
     const loadAuthenticatedData = () => {
       try {
@@ -47,24 +46,34 @@ const nav = useNavigate();
           nav('/login'); // Redirect to login if no authenticated patient
           return;
       }
-  
+
       const patientData = JSON.parse(authenticatedPatient)
       console.log('Loaded authenticated patient data:', patientData);
-
       const calculatedAge = calcAge(patientData.birthdate);
-     
+
+  // Patient profile
       setProfile({
-        first_name: patientData.first_name,
-        last_name: patientData.last_name,
-        middle_initial: patientData.middle_initial,
-        name: `${patientData.first_name}${patientData.middle_initial ? ' ' + patientData.middle_initial + '.' : ''} ${patientData.last_name}`, 
-        // name: `${patientData.first_name} ${patientData.last_name}`, 
-        patientId: patientData.patient_id,
-        contact: patientData.contact,
-        dob: patientData.birthdate,
-        age: calculatedAge
-      })
-    
+            first_name: patientData.first_name,
+            last_name: patientData.last_name,
+            middle_initial: patientData.middle_initial,
+            name: `${patientData.first_name}${patientData.middle_initial ? ' ' + patientData.middle_initial + '.' : ''} ${patientData.last_name}`, 
+            // name: `${patientData.first_name} ${patientData.last_name}`, 
+            patientId: patientData.patient_id,
+            contact: patientData.contact,
+            dob: patientData.birthdate,
+            age: calculatedAge
+          })
+  // const ageFromDob = calcAge(profile.dob)
+  // const ageDisplay = ageFromDob ?? (Number.isFinite(profile.age) ? profile.age : '—')
+
+  // Latest vitals
+      // setLatest =
+      //   (() => {
+      //     try { return JSON.parse(localStorage.getItem('latestVitals') || 'null') }
+      //     catch { return null }
+      //   })() ||
+      //   { heartRate: 71, temperature: 36.8, spo2: 98, height: 179.5, weight: 64.8, bmi: 20.1 }
+
       setLatest({
         heartRate: 71,
         temperature: 36.8,
@@ -73,21 +82,21 @@ const nav = useNavigate();
         weight: 64.8,
         bmi: 20.1
       })
-  
-      setRows([
+
+      setRows = ([
         { date: '2025-08-20', hr: 78, bp: '120/80', temp: '36.6 °C', spo2: '98%' },
         { date: '2025-07-10', hr: 74, bp: '118/76', temp: '36.7 °C', spo2: '99%' },
       ])
-  
+
       setLoading(false)
-  
+
       } catch (err) {
         console.error('Error loading patient data:', err)
         alert('Error loading patient data. Please login again.')
         nav('/login') 
       }
     }
-  
+
     loadAuthenticatedData()
   }, [nav]);
 
@@ -99,63 +108,6 @@ const nav = useNavigate();
 }
 
 const printLatest = () => window.print()
-
-if (loading) {
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
-        <p className="mt-4 text-slate-600">Loading your records...</p>
-      </div>
-    </div>
-  )
-}
-
-if (!profile) {
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center">
-        <p className="text-slate-600">Unable to load patient data.</p>
-        <button
-          onClick={() => nav('/login')}
-          className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-lg"
-        >
-          Return to Login
-        </button>
-      </div>
-    </div>
-  )
-}
-
-  // Patient profile
-  // const profile =
-  //   (() => {
-  //     try { return JSON.parse(localStorage.getItem('patientProfile') || 'null') }
-  //     catch { return null }
-  //   })() ||
-  //   { name: 'Juan Dela Cruz', patientId: 'P-000123', contact: '+63 912 345 6789', dob: '1998-05-12' }
-
-  // const ageFromDob = calcAge(profile.dob)
-  // const ageDisplay = ageFromDob ?? (Number.isFinite(profile.age) ? profile.age : '—')
-
-  // // Latest vitals
-  // const latest =
-  //   (() => {
-  //     try { return JSON.parse(localStorage.getItem('latestVitals') || 'null') }
-  //     catch { return null }
-  //   })() ||
-  //   { heartRate: 71, temperature: 36.8, spo2: 98, height: 179.5, weight: 64.8, bmi: 20.1 }
-
-  // const rows = [
-  //   { date: '2025-08-20', hr: 78, bp: '120/80', temp: '36.6 °C', spo2: '98%' },
-  //   { date: '2025-07-10', hr: 74, bp: '118/76', temp: '36.7 °C', spo2: '99%' },
-  // ]
-
-
-  // const handleLogout = () => {
-  //   // redirect to login page
-  //   window.location.href = '/login'
-  // }
 
   const Card = ({ label, icon, value, unit, alt }) => (
     <div className="rounded-2xl border bg-white p-5">
@@ -176,8 +128,6 @@ if (!profile) {
       {unit && <div className="mt-1 text-xs text-slate-500">{unit}</div>}
     </div>
   )
-
-  const ageDisplay = profile.age ?? '—'
 
   return (
     <section className="relative mx-auto max-w-5xl px-4 py-16"> 

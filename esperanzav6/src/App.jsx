@@ -22,7 +22,7 @@ import PatientLogin from './pages/PatientLogin'
 import LoginAuth from './pages/LoginAuth'         
 import bgImage from './assets/background.png'
 import PatientRecords from './pages/PatientRecords'
-import KioskStatus from './pages/KioskStatus'
+import QueueManagement from './pages/QueueManagement'
 import Reports from './pages/Reports'
 
 export default function App() {
@@ -48,7 +48,7 @@ export default function App() {
           <Route path="/records" element={<Records />} />
           <Route path="/staff" element={<Staff />} />
           <Route path="/staff/patient-records" element={<PatientRecords />} />
-          <Route path="/staff/kiosk-status" element={<KioskStatus />} />
+          <Route path="/staff/QueueManagement" element={<QueueManagement />} />
           <Route path="/staff/reports" element={<Reports />} />
         </Routes>
       </main>

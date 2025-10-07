@@ -6,7 +6,7 @@ import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import reportsIcon from '../assets/file.png'
 import patientsIcon from '../assets/patients.png'
-import kioskIcon from '../assets/status.png'
+import queueIcon from '../assets/queue.png'
 import logoutIcon from '../assets/logout.png'   
 
 export default function Staff() {
@@ -17,12 +17,12 @@ export default function Staff() {
     "border border-emerald-500/60 shadow-lg hover:shadow-xl overflow-hidden px-6 py-8 text-white flex flex-col items-center text-center"
 
   const handleLogout = () => {
-    // Clear stored staff session data if you have any (CAN BE MODIFIED AS NEEDED)
+    // Clear stored staff session data if you have any (MODIFY THIS AS NEEDED)
     localStorage.removeItem('staffProfile')
     localStorage.removeItem('patientProfile')
     localStorage.removeItem('latestVitals')
     localStorage.removeItem('vitalsHistory')
-    nav('/login') // redirect to login page
+    nav('/login')
   }
 
   return (
@@ -42,7 +42,7 @@ export default function Staff() {
         Healthcare Personnel&apos;s Dashboard
       </h2>
       <p className="mt-2 text-slate-600 text-center">
-        Manage patient records and monitor kiosk sessions.
+        Manage patient records and supervise queuing system.
       </p>
 
       <div className="mt-8 grid md:grid-cols-3 gap-6">
@@ -56,14 +56,14 @@ export default function Staff() {
           <p className="mt-1 text-white/85">Search, view, and update records.</p>
         </Link>
 
-        <Link to="/staff/kiosk-status" className={tile}>
+        <Link to="/staff/QueueManagement" className={tile}>
           <img
-            src={kioskIcon}
-            alt="Kiosk Status"
+            src={queueIcon}
+            alt="Queue Management"
             className="h-16 w-16 object-contain mb-4"
           />
-          <h3 className="text-xl font-extrabold">Kiosk Status</h3>
-          <p className="mt-1 text-white/85">Monitor active measurements.</p>
+          <h3 className="text-xl font-extrabold"> Queue Management</h3>
+          <p className="mt-1 text-white/85">Supervise the queue's workflow.</p>
         </Link>
 
         <Link to="/staff/reports" className={tile}>
