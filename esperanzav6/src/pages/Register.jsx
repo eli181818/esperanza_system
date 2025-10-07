@@ -21,6 +21,7 @@ export default function Register() {
   const [middle_initial, setMiddleInitial] = useState('') 
   const [last_name, setLastName] = useState('')
 
+  const [age, setAge] = useState('')
   const [gender, setGender] = useState('Male')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
@@ -29,7 +30,6 @@ export default function Register() {
   const [year, setYear] = useState(new Date().getFullYear())
   const [username, setUsername] = useState('')
   const [pin, setPin] = useState('')
-  const [patientIdDisplay, setPatientIdDisplay] = useState(null)
 
   // Biometric
   const [fpStatus, setFpStatus] = useState('idle')
@@ -76,7 +76,7 @@ export default function Register() {
       alert('Please capture fingerprint before registering.')
       return
     }
-    if (!first_name.trim() || !last_mame.trim()) {
+    if (!first_name.trim() || !last_name.trim()) {
       alert('Please enter first and last name.')
       return
     }
@@ -99,7 +99,8 @@ export default function Register() {
       address: address.trim(),
       gender,
       username: username.trim(),
-      brithdate: dob,                       
+      birthdate: dob,      
+      age: Number(age) || undefined,                 
       pin: pin.trim(),
       fingerprintEnrolled: fpStatus === 'enrolled',
     }
@@ -122,6 +123,9 @@ export default function Register() {
       const data = await res.json()
       console.log("Patient created:", data)
 
+      setCreating(false)
+      nav('/vitals')
+
     } catch (err) {
       console.error("Network error:", err)
       alert("Network error: " + err.message)
@@ -130,10 +134,10 @@ export default function Register() {
   }
     // localStorage.setItem('patientProfile', JSON.stringify(patientProfile))
 
-    setTimeout(() => {
-      setCreating(false)
-      nav('/vitals/weight', { state: { afterCaptureGoTo: '/records' } })
-    }, 600)
+    // setTimeout(() => {
+    //   setCreating(false)
+    //   nav('/vitals/weight', { state: { afterCaptureGoTo: '/records' } })
+    // }, 600)
 
   return (
     <section

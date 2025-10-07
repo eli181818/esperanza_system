@@ -10,6 +10,8 @@ import weightIcon from '../assets/weight.png'
 import bmiIcon from '../assets/body-mass-index.png'
 import printIcon from '../assets/printer.png'
 import logoutIcon from '../assets/logout.png'  
+import { useNavigate } from 'react-router-dom'
+
 
 export default function Records() {
 const [profile, setProfile] = useState(null);
@@ -83,7 +85,7 @@ const nav = useNavigate();
         bmi: 20.1
       })
 
-      setRows = ([
+      setRows([
         { date: '2025-08-20', hr: 78, bp: '120/80', temp: '36.6 °C', spo2: '98%' },
         { date: '2025-07-10', hr: 74, bp: '118/76', temp: '36.7 °C', spo2: '99%' },
       ])
