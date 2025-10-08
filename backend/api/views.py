@@ -1,12 +1,14 @@
-from django.shortcuts import render
+from django.shortcuts import render  # Unused but kept if needed elsewhere
 from rest_framework import viewsets, status
-from .models import Patient, VitalSigns, HCStaff
-from .serializers import PatientSerializer, VitalSignsSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action, api_view
-from rest_framework.response import Response    
-from django.db.models import Q
-from datetime import datetime
+from rest_framework.response import Response
+from .models import Patient, VitalSigns, HCStaff, QueueEntry
+from .serializers import PatientSerializer, VitalSignsSerializer, QueueEntrySerializer  # Assumes serializers.py exists
+from django.db.models import Q, Case, When, IntegerField  # For queue sorting
+from django.utils import timezone  # For timezone-aware datetime
+from .utils import compute_patient_priority
+
 
 # Create your views here.
 
@@ -15,15 +17,15 @@ class PatientViewSet(viewsets.ModelViewSet):
     serializer_class = PatientSerializer
     permission_classes = [AllowAny] 
     
-    @action(detail=False, methods=['get']) # Custom action to get patient by PIN
-    def by_pin(self, request): # GET /patients/by_pin/?pin=1234
+    @action(detail=False, methods=['get'])  # Custom action to get patient by PIN
+    def by_pin(self, request):  # GET /patients/by_pin/?pin=1234
         pin = request.query_params.get('pin')   
         if not pin:
             return Response({"error": "PIN is required"}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            patient = Patient.objects.get(pin=pin) # Fetch patient by PIN
-            serializer = self.get_serializer(patient) # Serialize the patient data
-            return Response(serializer.data) # Return serialized data
+            patient = Patient.objects.get(pin=pin)  # Fetch patient by PIN
+            serializer = self.get_serializer(patient)  # Serialize the patient data
+            return Response(serializer.data)  # Return serialized data
         except Patient.DoesNotExist:
             return Response({"error": "Patient not found"}, status=status.HTTP_404_NOT_FOUND)
         
@@ -46,7 +48,7 @@ class VitalSignsViewSet(viewsets.ModelViewSet):
     serializer_class = VitalSignsSerializer
     permission_classes = [AllowAny]
     
-    def get_queryset(self): # Filtering vital signs by patient_id and date range
+    def get_queryset(self):  # Filtering vital signs by patient_id and date range
         queryset = VitalSigns.objects.all()
         
         # Filter by patient_id
@@ -54,25 +56,28 @@ class VitalSignsViewSet(viewsets.ModelViewSet):
         if patient_id:
             queryset = queryset.filter(patient__patient_id=patient_id)
         
-        # Filter by date range
+        # Filter by date range (fixed: use date_time_recorded)
         date_from = self.request.query_params.get('date_from')
         date_to = self.request.query_params.get('date_to')
         
         if date_from:
-            queryset = queryset.filter(timestamp__gte=date_from)
+            queryset = queryset.filter(date_time_recorded__gte=date_from)
         if date_to:
-            queryset = queryset.filter(timestamp__lte=date_to)
+            queryset = queryset.filter(date_time_recorded__lte=date_to)
             
-        return queryset.select_related('patient').order_by('-timestamp')
+        return queryset.select_related('patient').order_by('-date_time_recorded')  # Fixed: correct field
     
-    @action(detail=False, methods=['get'], url_path='by_patient/(?P<patient_id>[^/.]+)') # Custom action to get vitals by patient_id
-    def by_patient(self, request, patient_id=None):
+    @action(detail=False, methods=['get'])  # Simplified: Use query params
+    def by_patient(self, request):
+        patient_id = request.query_params.get('patient_id')  # GET /vitals/by_patient/?patient_id=ABC
+        if not patient_id:
+            return Response({"error": "patient_id is required"}, status=status.HTTP_400_BAD_REQUEST)
         vitals = VitalSigns.objects.filter(patient__patient_id=patient_id)
         serializer = self.get_serializer(vitals, many=True)
         return Response(serializer.data)
-    
+
 @api_view(['POST'])
-def receive_vital_signs(request): # FOR RPi
+def receive_vital_signs(request):  # FOR RPi
     """
     FOR RPi - Receives vital signs data from Raspberry Pi
     
@@ -83,12 +88,13 @@ def receive_vital_signs(request): # FOR RPi
         "temperature": 36.5,
         "oxygen_saturation": 98,
         "weight": 65.5,
-        "height": 170.0,
-        "BMI": 22.6
-    }"""
+        "height": 170.0
+        # BMI optional: auto-computed from height/weight
+    }
+    """
     
     try:
-        data = request.data # Expecting JSON data
+        data = request.data  # Expecting JSON data
         
         patient_id = data.get('patient_id')
         if not patient_id:
@@ -107,24 +113,31 @@ def receive_vital_signs(request): # FOR RPi
                 status=status.HTTP_404_NOT_FOUND
             )
             
-        vital_signs = VitalSigns.objects.create( # create new record from received data
+        # Create vital signs (no 'timestamp'; auto_now_add handles it. BMI auto-computed)
+        vital_signs = VitalSigns.objects.create(
             patient=patient,
+            device_id=data.get('device_id'),  # Optional from RPi
             heart_rate=data.get('heart_rate'),
             temperature=data.get('temperature'),
             oxygen_saturation=data.get('oxygen_saturation'),
             weight=data.get('weight'),
             height=data.get('height'),
-            BMI=data.get('BMI'),
-            timestamp=datetime.now()
+            # BMI: Auto-computed in model.save()
+            # Add BP if implemented: blood_pressure_systolic=data.get('systolic'), etc.
         )
         
-        # Serialize and return the created record
+        queue_entry, created = QueueEntry.objects.get_or_create(patient=patient)
+        queue_entry.priority = compute_patient_priority(patient)
+        queue_entry.save()
+        
+        # Serialize and return
         serializer = VitalSignsSerializer(vital_signs)
+        patient_name = f"{patient.first_name} {patient.last_name}".strip()
         
         return Response({
             "success": True,
             "message": "Vital signs received and saved successfully",
-            "patient_name": patient.name,
+            "patient_name": patient_name,
             "data": serializer.data
         }, status=status.HTTP_201_CREATED)
         
@@ -143,7 +156,7 @@ def test_rpi_connection(request):
     return Response({
         "status": "connected",
         "message": "Django server is reachable from Raspberry Pi",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": timezone.now().isoformat()
     })
     
 @api_view(['POST'])
@@ -188,25 +201,33 @@ def login(request):
     
     return Response({"error": "Invalid login type"}, status=status.HTTP_400_BAD_REQUEST)
 
-
-
 @api_view(['GET'])
 def get_all_patients(request):
-    # You might want to verify the user is staff here
-    user = request.session.get('user')  # or however you handle auth
-    
+    # Add auth check if needed (e.g., permission_classes = [IsAuthenticated])
     patients = Patient.objects.all()
     serializer = PatientSerializer(patients, many=True)
     return Response(serializer.data)
 
-# @api_view(['POST'])
-# def receive_vital_signs(request): # FOR RPi
-#     serializer = VitalSignsSerializer(data=request.data)
+class QueueViewSet(viewsets.ModelViewSet):
+    queryset = QueueEntry.objects.all()
+    serializer_class = QueueEntrySerializer
+    permission_classes = [AllowAny]  # Restrict in production
     
-#     if serializer.is_valid():
-#         serializer.save() # save data to db
-#         return Response(serializer.data, status=status.HTTP_201_CREATED)
-    
-#     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
+    @action(detail=False, methods=['get'])
+    def current_queue(self, request):
+        """Get sorted queue: Prioritize by priority level, then entered_at (earliest first)."""
+        queue = QueueEntry.objects.all().select_related(
+            'patient', 'patient__vital_signs'  # Fixed: correct related_name
+        ).annotate(
+            priority_order=Case(
+                When(priority='CRITICAL', then=1),
+                When(priority='HIGH', then=2),
+                When(priority='MEDIUM', then=3),
+                default=4,
+                output_field=IntegerField()
+            )
+        ).order_by('priority_order', 'entered_at')
+        
+        serializer = self.get_serializer(queue, many=True)
+        return Response(serializer.data)
+ 

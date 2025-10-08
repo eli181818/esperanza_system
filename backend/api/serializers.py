@@ -1,5 +1,4 @@
-from . models import Patient
-from . models import VitalSigns
+from .models import Patient, QueueEntry, VitalSigns
 from rest_framework import serializers
 import re 
 from datetime import date
@@ -35,6 +34,13 @@ class VitalSignsSerializer(serializers.ModelSerializer):
     class Meta:
         model = VitalSigns
         fields = '__all__'
+
+class QueueEntrySerializer(serializers.ModelSerializer):
+    patient = PatientSerializer(read_only=True)
+    class Meta:
+        model = QueueEntry
+        fields = ['id', 'patient', 'priority', 'entered_at', 'queue_number']
+  
         
     
     

@@ -1,11 +1,11 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import PatientViewSet, VitalSignsViewSet, login, receive_vital_signs, get_all_patients, test_rpi_connection
+from .views import PatientViewSet, VitalSignsViewSet, QueueViewSet, login, receive_vital_signs, get_all_patients, test_rpi_connection
 
 router = DefaultRouter()
 router.register(r'patients', PatientViewSet)
 router.register(r'vitals', VitalSignsViewSet)
-
+router.register(r'queue', QueueViewSet)
 
 urlpatterns = [ # endpoints
     path('login/', login, name="login"), # handles login via PIN
