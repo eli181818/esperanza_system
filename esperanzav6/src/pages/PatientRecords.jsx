@@ -23,6 +23,18 @@ export default function PatientRecords() {
   const [loading, setLoading] = useState(false)
   const [latestVitals, setLatestVitals] = useState(null)
   const [history, setHistory] = useState([])
+  const constructName = (patient) => {
+  if (patient.name) return patient.name
+  
+  const parts = [patient.first_name, patient.middle_initial, patient.last_name]
+    .filter(Boolean)
+  
+  if (patient.middle_initial) {
+    return `${patient.first_name} ${patient.middle_initial}. ${patient.last_name}`
+  }
+  
+  return parts.join(' ') || '—'
+}
 
   // Fetch all patients on mount
   useEffect(() => {
@@ -180,7 +192,7 @@ export default function PatientRecords() {
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h3 className="text-2xl font-extrabold" style={{ color: BRAND.text }}>
-                      {p.name || '—'}
+                      {constructName(p)}
                     </h3>
                     <p className="text-sm" style={{ color: BRAND.text }}>
                       Patient ID: <span className="font-semibold">{p.patient_id || '—'}</span> •&nbsp;

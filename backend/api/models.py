@@ -16,7 +16,7 @@ class Patient(models.Model):
     gender = models.CharField(max_length=6, choices=[('Male', 'Male'), ('Female', 'Female')])
     contact = models.CharField(max_length=11, default='N/A')
     address = models.TextField(max_length=450)
-    username = models.CharField(max_length=50, null=True, blank=True)
+    username = models.CharField(max_length=50, null=True, blank=True, unique=True)
     birthdate = models.DateField(null=True, blank=True)
     pin = models.CharField(max_length=4)
     fingerprint_id = models.CharField(max_length=4, null=True, blank=True)

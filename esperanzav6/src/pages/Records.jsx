@@ -1,7 +1,6 @@
 // Records.jsx
 // Page for patients to DISPLAY patient records and vitals
 
-import React from 'react'
 import heartRateIcon from '../assets/heart-rate.png'
 import temperatureIcon from '../assets/thermometer.png'
 import spo2Icon from '../assets/oxygen-saturation.png'
@@ -11,14 +10,14 @@ import bmiIcon from '../assets/body-mass-index.png'
 import printIcon from '../assets/printer.png'
 import logoutIcon from '../assets/logout.png'  
 import { useNavigate } from 'react-router-dom'
-
+import React, { useState, useEffect } from 'react'
 
 export default function Records() {
-const [profile, setProfile] = useState(null);
-const [latest, setLatest] = useState(null);
-const [rows, setRows] = useState([]);
-const [loading, setLoading] = useState(true);
-const nav = useNavigate();
+  const [profile, setProfile] = useState(null);
+  const [latest, setLatest] = useState(null);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const nav = useNavigate();
 
   const calcAge = (dobStr) => {
     if (!dobStr) return null
@@ -40,76 +39,63 @@ const nav = useNavigate();
       .map(s => s[0]?.toUpperCase())
       .join('') || 'PT'
   
-  useEffect(() => { // Fetch patient data on component mount
+  useEffect(() => {
     const loadAuthenticatedData = () => {
       try {
         const authenticatedPatient = sessionStorage.getItem('authenticatedPatient')
         if (!authenticatedPatient) {
-          nav('/login'); // Redirect to login if no authenticated patient
-          return;
-      }
+          nav('/login')
+          return
+        }
 
-      const patientData = JSON.parse(authenticatedPatient)
-      console.log('Loaded authenticated patient data:', patientData);
-      const calculatedAge = calcAge(patientData.birthdate);
+        const patientData = JSON.parse(authenticatedPatient)
+        console.log('Loaded authenticated patient data:', patientData)
+        const calculatedAge = calcAge(patientData.birthdate)
 
-  // Patient profile
-      setProfile({
-            first_name: patientData.first_name,
-            last_name: patientData.last_name,
-            middle_initial: patientData.middle_initial,
-            name: `${patientData.first_name}${patientData.middle_initial ? ' ' + patientData.middle_initial + '.' : ''} ${patientData.last_name}`, 
-            // name: `${patientData.first_name} ${patientData.last_name}`, 
-            patientId: patientData.patient_id,
-            contact: patientData.contact,
-            dob: patientData.birthdate,
-            age: calculatedAge
-          })
-  // const ageFromDob = calcAge(profile.dob)
-  // const ageDisplay = ageFromDob ?? (Number.isFinite(profile.age) ? profile.age : '—')
+        setProfile({
+          first_name: patientData.first_name,
+          last_name: patientData.last_name,
+          middle_initial: patientData.middle_initial,
+          name: `${patientData.first_name}${patientData.middle_initial ? ' ' + patientData.middle_initial + '.' : ''} ${patientData.last_name}`,
+          patientId: patientData.patient_id,
+          contact: patientData.contact,
+          dob: patientData.birthdate,
+          age: calculatedAge
+        })
 
-  // Latest vitals
-      // setLatest =
-      //   (() => {
-      //     try { return JSON.parse(localStorage.getItem('latestVitals') || 'null') }
-      //     catch { return null }
-      //   })() ||
-      //   { heartRate: 71, temperature: 36.8, spo2: 98, height: 179.5, weight: 64.8, bmi: 20.1 }
+        setLatest({
+          heartRate: 71,
+          temperature: 36.8,
+          spo2: 98,
+          height: 179.5,
+          weight: 64.8,
+          bmi: 20.1
+        })
 
-      setLatest({
-        heartRate: 71,
-        temperature: 36.8,
-        spo2: 98,
-        height: 179.5,
-        weight: 64.8,
-        bmi: 20.1
-      })
+        setRows([
+          { date: '2025-08-20', hr: 78, bp: '120/80', temp: '36.6 °C', spo2: '98%' },
+          { date: '2025-07-10', hr: 74, bp: '118/76', temp: '36.7 °C', spo2: '99%' },
+        ])
 
-      setRows([
-        { date: '2025-08-20', hr: 78, bp: '120/80', temp: '36.6 °C', spo2: '98%' },
-        { date: '2025-07-10', hr: 74, bp: '118/76', temp: '36.7 °C', spo2: '99%' },
-      ])
-
-      setLoading(false)
+        setLoading(false)
 
       } catch (err) {
         console.error('Error loading patient data:', err)
         alert('Error loading patient data. Please login again.')
-        nav('/login') 
+        nav('/login')
       }
     }
 
     loadAuthenticatedData()
-  }, [nav]);
+  }, [nav])
 
   const handleLogout = () => {
-  // Clear session storage and redirect to login page
-  sessionStorage.removeItem('authenticatedPatient')
-  sessionStorage.removeItem('userPin')
-  nav('/login')
-}
+    sessionStorage.removeItem('authenticatedPatient')
+    sessionStorage.removeItem('userPin')
+    nav('/login')
+  }
 
-const printLatest = () => window.print()
+  const printLatest = () => window.print()
 
   const Card = ({ label, icon, value, unit, alt }) => (
     <div className="rounded-2xl border bg-white p-5">
@@ -130,6 +116,20 @@ const printLatest = () => window.print()
       {unit && <div className="mt-1 text-xs text-slate-500">{unit}</div>}
     </div>
   )
+
+  // Loading state
+  if (loading || !profile || !latest) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-300 border-t-emerald-600"></div>
+          <p className="mt-2 text-slate-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const ageDisplay = profile.age ?? '—'
 
   return (
     <section className="relative mx-auto max-w-5xl px-4 py-16"> 
