@@ -123,11 +123,11 @@ export default function Register() {
       const data = await res.json()
       console.log("Patient created:", data)
 
-      setTimeout(() => {
-        setCreating(false)
-        nav('/vitals/weight', { state: { afterCaptureGoTo: '/records' } })
-      }, 600)
+      sessionStorage.setItem('authenticatedPatient', JSON.stringify(data))
 
+      setCreating(false)
+      nav('/vitals/weight', { state: { afterCaptureGoTo: '/records' } })
+      
     } catch (err) {
       console.error("Network error:", err)
       alert("Network error: " + err.message)
