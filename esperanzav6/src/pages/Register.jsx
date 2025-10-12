@@ -123,8 +123,10 @@ export default function Register() {
       const data = await res.json()
       console.log("Patient created:", data)
 
-      setCreating(false)
-      nav('/vitals')
+      setTimeout(() => {
+        setCreating(false)
+        nav('/vitals/weight', { state: { afterCaptureGoTo: '/records' } })
+      }, 600)
 
     } catch (err) {
       console.error("Network error:", err)
@@ -134,10 +136,7 @@ export default function Register() {
   }
     // localStorage.setItem('patientProfile', JSON.stringify(patientProfile))
 
-    // setTimeout(() => {
-    //   setCreating(false)
-    //   nav('/vitals/weight', { state: { afterCaptureGoTo: '/records' } })
-    // }, 600)
+ 
 
   return (
     <section
