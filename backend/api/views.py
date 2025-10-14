@@ -8,6 +8,8 @@ from .serializers import PatientSerializer, VitalSignsSerializer, QueueEntrySeri
 from django.db.models import Q, Case, When, IntegerField  # For queue sorting
 from django.utils import timezone  # For timezone-aware datetime
 from .utils import compute_patient_priority
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import api_view
 
 
 # Create your views here.
@@ -75,6 +77,8 @@ class VitalSignsViewSet(viewsets.ModelViewSet):
         vitals = VitalSigns.objects.filter(patient__patient_id=patient_id)
         serializer = self.get_serializer(vitals, many=True)
         return Response(serializer.data)
+    
+    
 
 @api_view(['POST'])
 def receive_vital_signs(request):  # FOR RPi
@@ -158,7 +162,8 @@ def test_rpi_connection(request):
         "message": "Django server is reachable from Raspberry Pi",
         "timestamp": timezone.now().isoformat()
     })
-    
+
+@csrf_exempt
 @api_view(['POST'])
 def login(request):
     pin = request.data.get("pin")
@@ -174,11 +179,17 @@ def login(request):
     if login_type == 'staff':
         try:
             staff = HCStaff.objects.get(staff_pin=pin)
+            
+            # CREATE SESSION (server-side)
+            request.session['user_id'] = staff.id
+            request.session['user_type'] = 'staff'
+            request.session['name'] = staff.name
+            
             return Response({
-                "id": staff.id,
-                "name": staff.name,
-                "role": "staff"
+                "role": "staff",
+                "name": staff.name
             })
+            
         except HCStaff.DoesNotExist:
             return Response({"error": "Invalid staff PIN"}, status=status.HTTP_401_UNAUTHORIZED)
     
@@ -189,17 +200,45 @@ def login(request):
         
         try:
             patient = Patient.objects.get(username=username.strip(), pin=pin)
+            
+            request.session['user_id'] = patient.id
+            request.session['user_type'] = 'patient'
+            request.session['patient_id'] = patient.patient_id
+            
             return Response({
-                "id": patient.id,
-                "first_name": patient.first_name,
-                "last_name": patient.last_name,
                 "role": "patient",
-                "patient": PatientSerializer(patient).data
+                "patient_id": patient.patient_id,  # Just the ID, not full data
+                "name": f"{patient.first_name} {patient.last_name}"
             })
+            
         except Patient.DoesNotExist:
             return Response({"error": "Invalid username or PIN"}, status=status.HTTP_401_UNAUTHORIZED)
     
     return Response({"error": "Invalid login type"}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+def get_patient_profile(request):
+    """Get current logged-in patient's profile"""
+    user_type = request.session.get('user_type')
+    
+    if user_type != 'patient':
+        return Response({"error": "Not authenticated as patient"}, status=status.HTTP_401_UNAUTHORIZED)
+    
+    patient_id = request.session.get('patient_id')
+    
+    try:
+        patient = Patient.objects.get(patient_id=patient_id)
+        serializer = PatientSerializer(patient)
+        return Response(serializer.data)
+    except Patient.DoesNotExist:
+        return Response({"error": "Patient not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+def logout(request):
+    """Clear session"""
+    request.session.flush()
+    return Response({"message": "Logged out successfully"})
 
 @api_view(['GET'])
 def get_all_patients(request):

@@ -83,53 +83,43 @@ export default function Register() {
 
     setCreating(true)
 
-    const displayName = [
-      first_name.trim(),
-      middle_initial ? `${middle_initial.trim().toUpperCase()}.` : null,
-      last_name.trim()
-    ].filter(Boolean).join(' ')
-
     const patientProfile = {
-      first_name: first_name.trim(),
-      middle_initial: middle_initial.trim().toUpperCase() || undefined,
-      last_name: last_name.trim(),
-      name: displayName,
-      // patient_id: patient_id(),
-      contact: phone.trim(),
-      address: address.trim(),
-      gender,
-      username: username.trim(),
-      birthdate: dob,      
-      age: Number(age) || undefined,                 
-      pin: pin.trim(),
-      fingerprintEnrolled: fpStatus === 'enrolled',
-    }
-      try { // Send to backend
-        const res = await fetch('http://127.0.0.1:8000/patients/', {
+    first_name: first_name.trim(),
+    middle_initial: middle_initial.trim(),
+    last_name: last_name.trim(),
+    gender: gender,
+    birthdate: dob,  // Uses the useMemo calculated value
+    contact: phone.trim(),
+    address: address.trim(),
+    username: username.trim(),
+    pin: pin
+  }
+
+    try {
+      const res = await fetch('http://localhost:8000/patients/', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json'},
+        credentials: 'include',  // Include credentials
         body: JSON.stringify(patientProfile),
       })
       
       if (!res.ok) {
         const err = await res.json()
-        console.error("Validation error:", err)
         alert("Failed to register patient:\n" + JSON.stringify(err, null, 2))
         setCreating(false)
         return
       }
 
       const data = await res.json()
-      console.log("Patient created:", data)
-
-      sessionStorage.setItem('authenticatedPatient', JSON.stringify(data))
+      
+      // Only store minimal info
+      sessionStorage.setItem('patientName', data.name)
+      sessionStorage.setItem('isAuthenticated', 'true')
 
       setCreating(false)
       nav('/vitals/weight', { state: { afterCaptureGoTo: '/records' } })
       
     } catch (err) {
-      console.error("Network error:", err)
       alert("Network error: " + err.message)
       setCreating(false)
     }

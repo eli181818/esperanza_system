@@ -42,8 +42,8 @@ export default function PatientRecords() {
     setLoading(true)
     try {
       const url = searchTerm
-        ? `http://127.0.0.1:8000/patients/?search=${encodeURIComponent(searchTerm)}`
-        : `http://127.0.0.1:8000/patients/`
+        ? `http://localhost:8000/patients/?search=${encodeURIComponent(searchTerm)}`
+        : `http://localhost:8000/patients/`
       const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to fetch patients')
       const data = await res.json()
@@ -56,7 +56,7 @@ export default function PatientRecords() {
     }
   }
 
-  // ✅ NEW — Automatically fetch vitals for the first patient
+  // Automatically fetch vitals for the first patient
   useEffect(() => {
     if (patients.length > 0) {
       const firstPatient = patients[0]
@@ -71,7 +71,7 @@ export default function PatientRecords() {
   // Fetch vitals for selected patient
   const fetchVitals = async (patientId) => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/patients/${patientId}/vitals/`)
+      const res = await fetch(`http://localhost:8000/patients/${patientId}/vitals/`)
       if (!res.ok) throw new Error('Failed to fetch vitals')
       const data = await res.json()
 
@@ -94,7 +94,7 @@ export default function PatientRecords() {
   const saveProfile = async () => {
     if (!currentPatient) return
     try {
-      const res = await fetch(`http://127.0.0.1:8000/patients/${currentPatient.id}/`, {
+      const res = await fetch(`http://localhost:8000/patients/${currentPatient.id}/`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(currentPatient),

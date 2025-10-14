@@ -15,27 +15,13 @@ export default function LoginAuth() {
   const nav = useNavigate()
 
   // UI state
-  const [mode, setMode] = useState(null)          // 'pin' | 'fp' | null
-  const [pin, setPin] = useState('')              // 4 digits from NumPad
-  const [username, setUsername] = useState('')    // only used for patients
+  const [mode, setMode] = useState(null)          
+  const [pin, setPin] = useState('')              
+  const [username, setUsername] = useState('')    
   const [isAuthenticating, setIsAuthenticating] = useState(false)
-  
 
-  // // Load saved patient profile from localStorage (placeholder for real auth)
-  // const savedPatient = useMemo(() => {
-  //   try { return JSON.parse(localStorage.getItem('patientProfile') || 'null') || null }
-  //   catch { return null }
-  // }, [])
-
-  // const completeLogin = () => {
-  //   if (role === 'staff') {
-  //     nav('/staff')
-  //   } else {
-  //     nav('/portal')
-  //   }
-  // }
   const authenticateUser = async (enteredPin, loginType) => {
-    if (isAuthenticating) return; // Prevent double submission
+    if (isAuthenticating) return
     if (loginType === 'patient' && username.trim().length === 0) {
       alert('Please enter your username.')
       return
@@ -44,18 +30,16 @@ export default function LoginAuth() {
     setIsAuthenticating(true)
     
     try {
-      // Include the username in the body for patient login
-      const bodyData = {
-        pin: enteredPin,
-        login_type: loginType,
-        // Send username for patient-specific login
-        ...(loginType === 'patient' && { username: username.trim() })
-      }
-
-      const res = await fetch(`http://127.0.0.1:8000/login/`, { 
+      const res = await fetch(`http://localhost:8000/login/`, { 
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify( bodyData )
+        headers: {
+          "Content-Type": "application/json" },
+        credentials: 'include',  // Send cookies
+        body: JSON.stringify({
+          pin: enteredPin,  
+          login_type: loginType,
+          ...(loginType === 'patient' && { username: username.trim() })
+        })
       })
 
       if (!res.ok) {
@@ -65,23 +49,20 @@ export default function LoginAuth() {
 
       const userData = await res.json()
 
-      // Verify that the returned role matches the expected login type
-      if (userData.role !== loginType) {
-        throw new Error(`Access denied: You don't have ${loginType} privileges`)
-      }
-
-      sessionStorage.setItem("user", JSON.stringify(userData)) // Store entire user data
-      // Navigate based on actual role
-      if (userData.role === 'staff') {
-        nav('/staff')
-      } else if (userData.role === 'patient') {
-        sessionStorage.setItem('authenticatedPatient', JSON.stringify(userData.patient))
+      // Store ONLY minimal info for UI display
+      if (userData.role === 'patient') {
+        sessionStorage.setItem('patientName', userData.name)
+        sessionStorage.setItem('isAuthenticated', 'true')
         nav('/portal')
+      } else if (userData.role === 'staff') {
+        sessionStorage.setItem('staffName', userData.name)
+        sessionStorage.setItem('isAuthenticated', 'true')
+        nav('/staff')
       }
       
     } catch (err) {
       alert(err.message || 'Authentication failed')
-      setPin('') // Clear the PIN on error
+      setPin('')
     } finally {
       setIsAuthenticating(false)
     }

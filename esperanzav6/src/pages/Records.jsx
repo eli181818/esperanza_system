@@ -40,16 +40,19 @@ export default function Records() {
       .join('') || 'PT'
   
   useEffect(() => {
-    const loadAuthenticatedData = () => {
+    const loadAuthenticatedData = async () => {
       try {
-        const authenticatedPatient = sessionStorage.getItem('authenticatedPatient')
-        if (!authenticatedPatient) {
+        // Fetch profile from backend 
+        const profileRes = await fetch('http://localhost:8000/patient/profile/', {
+          credentials: 'include'  // Send session cookie
+        })
+
+        if (profileRes.status === 401) {  // Unauthorized
           nav('/login')
           return
         }
 
-        const patientData = JSON.parse(authenticatedPatient)
-        console.log('Loaded authenticated patient data:', patientData)
+        const patientData = await profileRes.json()
         const calculatedAge = calcAge(patientData.birthdate)
 
         setProfile({
@@ -89,9 +92,17 @@ export default function Records() {
     loadAuthenticatedData()
   }, [nav])
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('authenticatedPatient')
-    sessionStorage.removeItem('userPin')
+  const handleLogout = async () => {
+    try {
+      await fetch('http://localhost:8000/logout/', {
+        method: 'POST',
+        credentials: 'include'
+      })
+    } catch (err) {
+      console.error('Logout error:', err)
+    }
+    
+    sessionStorage.clear()
     nav('/login')
   }
 
