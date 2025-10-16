@@ -96,24 +96,43 @@ export default function Register() {
   }
 
     try {
-      const res = await fetch('http://localhost:8000/patients/', {
+      // Register the patient
+      const registerRes = await fetch('http://localhost:8000/patients/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json'},
-        credentials: 'include',  // Include credentials
+        credentials: 'include',
         body: JSON.stringify(patientProfile),
       })
       
-      if (!res.ok) {
-        const err = await res.json()
+      if (!registerRes.ok) {
+        const err = await registerRes.json()
         alert("Failed to register patient:\n" + JSON.stringify(err, null, 2))
         setCreating(false)
         return
       }
 
-      const data = await res.json()
+      const registerData = await registerRes.json()
       
-      // Only store minimal info
-      sessionStorage.setItem('patientName', data.name)
+      // Log the user in immediately after registration
+      const loginRes = await fetch('http://localhost:8000/login/', {  // Fixed URL
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json'},
+        credentials: 'include',
+        body: JSON.stringify({
+          username: username.trim(),
+          pin: pin,
+          login_type: 'patient'  
+        }),
+      })
+
+      if (!loginRes.ok) {
+        alert("Registration successful but login failed. Please login manually.")
+        setCreating(false)
+        nav('/login')
+        return
+      }
+
+      // Now the user is authenticated with a session cookie
       sessionStorage.setItem('isAuthenticated', 'true')
 
       setCreating(false)
@@ -124,9 +143,7 @@ export default function Register() {
       setCreating(false)
     }
   }
-    // localStorage.setItem('patientProfile', JSON.stringify(patientProfile))
-
- 
+  
 
   return (
     <section
