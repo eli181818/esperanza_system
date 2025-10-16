@@ -24,13 +24,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-b@q8s+-vr53_3(qiebh&vansikx2g!t+v)#h30(k+du8#m6ody'
+# SECURITY WARNING: keep the secret key used in production secret
+SECRET_KEY = os.getenv('SECRET_KEY')
 
-# SECURITY WARNING: don't run with debug turned on in production!
+# SECURITY WARNING: don't run with debug turned on in production
 DEBUG = True
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["*"] # Fix in production!!!
 
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
@@ -156,15 +156,15 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
-    "http://127.0.0.1:5174",
-    "http://localhost:5174"
+    "http://127.0.0.1:5173",
+    "http://localhost:5173"
 ]
 CORS_ALLOW_CREDENTIALS = True  # Fixed typo
 
 # CSRF settings for session auth:
 CSRF_TRUSTED_ORIGINS = [
-    "http://127.0.0.1:5174",
-    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
 ]
 
 # Session Settings - ADD THESE NEW LINES

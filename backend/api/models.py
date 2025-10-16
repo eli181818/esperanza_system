@@ -84,7 +84,6 @@ class QueueEntry(models.Model):
         # Auto-compute priority on save (if not set)
         if not self.priority:
             self.priority = compute_patient_priority(self.patient)
-        super().save(*args, **kwargs)
         
         if not self.queue_number:
             today = timezone.now().date()
