@@ -19,9 +19,9 @@ class Patient(models.Model):
     username = models.CharField(max_length=50, null=True, blank=True, unique=True)
     birthdate = models.DateField(null=True, blank=True)
     pin = models.CharField(max_length=4)
-    fingerprint_id = models.CharField(max_length=4, null=True, blank=True)
+    fingerprint_id = models.CharField(max_length=4, null=True, blank=True, unique=True)
 
-    def save(self, *args, **kwargs):  # Auto-generate the patient_id; Calculate age
+    def save(self, *args, **kwargs):  # Calculate age
         if self.birthdate:
             today = date.today()
             calculated_age = today.year - self.birthdate.year

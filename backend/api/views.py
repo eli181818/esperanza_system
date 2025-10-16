@@ -4,9 +4,9 @@ from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from .models import Patient, VitalSigns, HCStaff, QueueEntry
-from .serializers import PatientSerializer, VitalSignsSerializer, QueueEntrySerializer  # Assumes serializers.py exists
+from .serializers import PatientSerializer, VitalSignsSerializer, QueueEntrySerializer 
 from django.db.models import Q, Case, When, IntegerField  # For queue sorting
-from django.utils import timezone  # For timezone-aware datetime
+from django.utils import timezone  
 from .utils import compute_patient_priority
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
