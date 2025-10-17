@@ -1,5 +1,6 @@
 // PatientRecords.jsx
 // Page for health personnel to view and edit patient records, including search functionality.
+// Note: This is a different page from Records.jsx, which is for patients to view their own records.
 
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -252,7 +253,28 @@ export default function PatientRecords() {
                   </button>
                 </div>
 
-                {/* Snapshot cards - now appear automatically */}
+                {/* Latest Vitals Card*/}
+                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                  <div className="rounded-2xl border p-5" style={{ background: BRAND.bg, color: BRAND.text, borderColor: BRAND.border }}>
+                    <div className="text-sm opacity-90">Heart Rate</div>
+                    <div className="mt-2 text-3xl font-extrabold tabular-nums">{latestVitals?.heartRate ?? '—'}</div>
+                    <div className="mt-1 text-xs opacity-80">BPM</div>
+                  </div>
+                  <div className="rounded-2xl border p-5" style={{ background: BRAND.bg, color: BRAND.text, borderColor: BRAND.border }}>
+                    <div className="text-sm opacity-90">Temperature</div>
+                    <div className="mt-2 text-3xl font-extrabold tabular-nums">{latestVitals?.temperature ?? '—'}</div>
+                    <div className="mt-1 text-xs opacity-80">°C</div>
+                  </div>
+                  <div className="rounded-2xl border p-5" style={{ background: BRAND.bg, color: BRAND.text, borderColor: BRAND.border }}>
+                    <div className="text-sm opacity-90">SpO₂</div>
+                    <div className="mt-2 text-3xl font-extrabold tabular-nums">{latestVitals?.spo2 ?? '—'}</div>
+                    <div className="mt-1 text-xs opacity-80">%</div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Snapshot cards - now appear automatically; Appears when there are vitals captured 
                 {currentPatient?.id === p.id && latestVitals && (
                   <div className="mt-6 grid gap-4 md:grid-cols-3">
                     <div
@@ -300,8 +322,7 @@ export default function PatientRecords() {
                   </div>
                 )}
               </>
-            ) : (
-              <>
+            ) : ( */}
                 {/* Edit form */}
                 <GradientHeader icon={accIcon}>Personal Information</GradientHeader>
 
