@@ -1,7 +1,8 @@
 // Records.jsx
 // Page for patients to DISPLAY patient records and vitals
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import heartRateIcon from '../assets/heart-rate.png'
 import temperatureIcon from '../assets/thermometer.png'
 import bloodPressureIcon from '../assets/blood-pressure.png'
@@ -10,9 +11,15 @@ import heightIcon from '../assets/height.png'
 import weightIcon from '../assets/weight.png'
 import bmiIcon from '../assets/body-mass-index.png'
 import printIcon from '../assets/printer.png'
-import logoutIcon from '../assets/logout.png'  
+import logoutIcon from '../assets/logout.png'
 
 export default function Records() {
+  const [profile, setProfile] = useState(null)
+  const [latest, setLatest] = useState(null)
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const nav = useNavigate()
+
   const calcAge = (dobStr) => {
     if (!dobStr) return null
     const dob = new Date(dobStr)
@@ -32,36 +39,88 @@ export default function Records() {
       .slice(0, 2)
       .map(s => s[0]?.toUpperCase())
       .join('') || 'PT'
+  
+  useEffect(() => {
+    const loadAuthenticatedData = async () => {
+      try {
+        // Fetch profile from backend 
+        const profileRes = await fetch('http://localhost:8000/patient/profile/', {
+          credentials: 'include'  // Send session cookie
+        })
 
-  // Patient profile
-  const profile =
-    (() => {
-      try { return JSON.parse(localStorage.getItem('patientProfile') || 'null') }
-      catch { return null }
-    })() ||
-    { name: 'Juan Dela Cruz', patientId: 'P-000123', contact: '+63 912 345 6789', dob: '1998-05-12' }
+        if (profileRes.status === 401) {  // Unauthorized
+          nav('/login')
+          return
+        }
 
-  const ageFromDob = calcAge(profile.dob)
-  const ageDisplay = ageFromDob ?? (Number.isFinite(profile.age) ? profile.age : '—')
+        const patientData = await profileRes.json()
+        const calculatedAge = calcAge(patientData.birthdate)
 
-  // Latest vitals
-  const latest =
-    (() => {
-      try { return JSON.parse(localStorage.getItem('latestVitals') || 'null') }
-      catch { return null }
-    })() ||
-    { heartRate: 71, temperature: 36.8, spo2: 98, height: 179.5, weight: 64.8, bmi: 20.1 }
+        setProfile({
+          first_name: patientData.first_name,
+          last_name: patientData.last_name,
+          middle_initial: patientData.middle_initial,
+          name: `${patientData.first_name}${patientData.middle_initial ? ' ' + patientData.middle_initial + '.' : ''} ${patientData.last_name}`,
+          patientId: patientData.patient_id,
+          contact: patientData.contact,
+          dob: patientData.birthdate,
+          age: calculatedAge
+        })
 
-  const rows = [
-    { date: '2025-08-20', hr: 78, bp: '120/80', temp: '36.6 °C', spo2: '98%' },
-    { date: '2025-07-10', hr: 74, bp: '118/76', temp: '36.7 °C', spo2: '99%' },
-  ]
+        // Fetch vitals from backend
+        const vitalsRes = await fetch('http://localhost:8000/patient/vitals/', {
+          credentials: 'include'
+        })
+
+        if (vitalsRes.ok) {
+          const vitalsData = await vitalsRes.json()
+          
+          // Set latest vitals
+          if (vitalsData.latest) {
+            setLatest({
+              heartRate: vitalsData.latest.heart_rate,
+              temperature: vitalsData.latest.temperature,
+              spo2: vitalsData.latest.spo2,
+              bloodPressure: vitalsData.latest.blood_pressure,
+              height: vitalsData.latest.height,
+              weight: vitalsData.latest.weight,
+              bmi: vitalsData.latest.bmi
+            })
+          }
+
+          // Set history
+          if (vitalsData.history) {
+            setRows(vitalsData.history)
+          }
+        }
+
+        setLoading(false)
+
+      } catch (err) {
+        console.error('Error loading patient data:', err)
+        alert('Error loading patient data. Please login again.')
+        nav('/login')
+      }
+    }
+
+    loadAuthenticatedData()
+  }, [nav])
+
+  const handleLogout = async () => {
+    try {
+      await fetch('http://localhost:8000/logout/', {
+        method: 'POST',
+        credentials: 'include'
+      })
+    } catch (err) {
+      console.error('Logout error:', err)
+    }
+    
+    sessionStorage.clear()
+    nav('/login')
+  }
 
   const printLatest = () => window.print()
-
-  const handleLogout = () => {
-    window.location.href = '/login'
-  }
 
   const Card = ({ label, icon, value, unit, alt }) => (
     <div className="rounded-2xl border bg-white p-5">
@@ -77,16 +136,25 @@ export default function Records() {
         )}
       </div>
       <div className="mt-3 text-3xl font-extrabold text-slate-900 tabular-nums">
-        {value}
+        {value ?? '—'}
       </div>
       {unit && <div className="mt-1 text-xs text-slate-500">{unit}</div>}
     </div>
   )
 
-  const history = (() => {
-  try { return JSON.parse(localStorage.getItem('vitalsHistory') || '[]') }
-  catch { return [] }
-  })();
+  // Loading state
+  if (loading || !profile) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-300 border-t-emerald-600"></div>
+          <p className="mt-2 text-slate-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const ageDisplay = profile.age ?? '—'
 
   return (
     <section className="relative mx-auto max-w-5xl px-4 py-16"> 
@@ -129,18 +197,60 @@ export default function Records() {
         </button>
       </div>
 
-      {/* Latest vitals cards */}
+      {/* Latest vitals cards - Now with 7 cards including Blood Pressure */}
       <div className="mt-4 grid gap-4 md:grid-cols-3 print:gap-2">
-        <Card label="Heart Rate" icon={heartRateIcon} alt="Heart rate" value={latest.heartRate} unit="BPM" />
-        <Card label="Temperature" icon={temperatureIcon} alt="Temperature" value={latest.temperature} unit="°C" />
-        <Card label="Oxygen Saturation" icon={spo2Icon} alt="Oxygen saturation" value={latest.spo2} unit="%" />
-        <Card label="Blood Pressure"icon={bloodPressureIcon} alt="Blood Pressure" value={latest.bp || '—'} unit="mmHg" />
-        <Card label="Height" icon={heightIcon} alt="Height" value={latest.height} unit="cm" />
-        <Card label="Weight" icon={weightIcon} alt="Weight" value={latest.weight} unit="kg" />
-        <Card label="BMI" icon={bmiIcon} alt="BMI" value={latest.bmi} unit="kg/m²" />
+        <Card 
+          label="Heart Rate" 
+          icon={heartRateIcon} 
+          alt="Heart rate" 
+          value={latest?.heartRate} 
+          unit="BPM" 
+        />
+        <Card 
+          label="Temperature" 
+          icon={temperatureIcon} 
+          alt="Temperature" 
+          value={latest?.temperature} 
+          unit="°C" 
+        />
+        <Card 
+          label="Oxygen Saturation" 
+          icon={spo2Icon} 
+          alt="Oxygen saturation" 
+          value={latest?.spo2} 
+          unit="%" 
+        />
+        <Card 
+          label="Blood Pressure" 
+          icon={bloodPressureIcon} 
+          alt="Blood Pressure" 
+          value={latest?.bloodPressure} 
+          unit="mmHg" 
+        />
+        <Card 
+          label="Height" 
+          icon={heightIcon} 
+          alt="Height" 
+          value={latest?.height} 
+          unit="cm" 
+        />
+        <Card 
+          label="Weight" 
+          icon={weightIcon} 
+          alt="Weight" 
+          value={latest?.weight} 
+          unit="kg" 
+        />
+        <Card 
+          label="BMI" 
+          icon={bmiIcon} 
+          alt="BMI" 
+          value={latest?.bmi} 
+          unit="kg/m²" 
+        />
       </div>
 
-      {/* Past vitals table */}
+      {/* Past vitals table - Now with 8 columns */}
       <div className="mt-8 overflow-x-auto rounded-2xl border border-slate-200 bg-white print:hidden">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-600">
@@ -156,37 +266,46 @@ export default function Records() {
             </tr>
           </thead>
           <tbody>
-            {history.length === 0 ? (
+            {rows.length === 0 ? (
               <tr>
                 <td className="px-4 py-6 text-center text-slate-500" colSpan={8}>
                   No history yet.
                 </td>
               </tr>
             ) : (
-              history.map((r, i) => (
+              rows.map((r, i) => (
                 <tr key={r.id || i} className="border-t border-slate-100">
                   <td className="px-4 py-3">{r.date ?? '—'}</td>
                   <td className="px-4 py-3">
-                    {r.hr != null ? `${r.hr} bpm` : '—'}
+                    {r.heart_rate != null ? `${r.heart_rate} bpm` : '—'}
                   </td>
                   <td className="px-4 py-3">
-                    {r.bp ?? '—'}
+                    {r.blood_pressure ?? '—'}
                   </td>
                   <td className="px-4 py-3">
-                    {/* history may store raw number or a formatted string */}
-                    {typeof r.temp === 'number' ? `${r.temp} °C` : (r.temp ?? '—')}
+                    {typeof r.temperature === 'number' 
+                      ? `${r.temperature} °C` 
+                      : (r.temperature ?? '—')}
                   </td>
                   <td className="px-4 py-3">
-                    {typeof r.spo2 === 'number' ? `${r.spo2}%` : (r.spo2 ?? '—')}
+                    {typeof r.spo2 === 'number' 
+                      ? `${r.spo2}%` 
+                      : (r.spo2 ?? '—')}
                   </td>
                   <td className="px-4 py-3">
-                    {typeof r.height === 'number' ? `${r.height} cm` : (r.height ?? '—')}
+                    {typeof r.height === 'number' 
+                      ? `${r.height} cm` 
+                      : (r.height ?? '—')}
                   </td>
                   <td className="px-4 py-3">
-                    {typeof r.weight === 'number' ? `${r.weight} kg` : (r.weight ?? '—')}
+                    {typeof r.weight === 'number' 
+                      ? `${r.weight} kg` 
+                      : (r.weight ?? '—')}
                   </td>
                   <td className="px-4 py-3">
-                    {typeof r.bmi === 'number' ? `${r.bmi} kg/m²` : (r.bmi ?? '—')}
+                    {typeof r.bmi === 'number' 
+                      ? `${r.bmi} kg/m²` 
+                      : (r.bmi ?? '—')}
                   </td>
                 </tr>
               ))
@@ -194,7 +313,6 @@ export default function Records() {
           </tbody>
         </table>
       </div>
-
 
       <p className="mt-4 hidden text-center text-xs text-slate-500 print:block">
         Printed: {new Date().toLocaleString()}

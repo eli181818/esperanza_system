@@ -15,51 +15,86 @@ export default function LoginAuth() {
   const nav = useNavigate()
 
   // UI state
-  const [mode, setMode] = useState(null)          // 'pin' | 'fp' | null
-  const [pin, setPin] = useState('')              // 4 digits from NumPad
-  const [username, setUsername] = useState('')    // only used for patients
+  const [mode, setMode] = useState(null)          
+  const [pin, setPin] = useState('')              
+  const [username, setUsername] = useState('')    
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
 
-  // Load saved patient profile from localStorage (placeholder for real auth)
-  const savedPatient = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem('patientProfile') || 'null') || null }
-    catch { return null }
-  }, [])
+  const authenticateUser = async (enteredPin, loginType) => {
+    if (isAuthenticating) return
+    if (loginType === 'patient' && username.trim().length === 0) {
+      alert('Please enter your username.')
+      return
+    }
 
-  const completeLogin = () => {
-    if (role === 'staff') {
-      nav('/staff')
-    } else {
-      nav('/portal')
+    setIsAuthenticating(true)
+    
+    try {
+      const res = await fetch(`http://localhost:8000/login/`, { 
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json" },
+        credentials: 'include',  // Send cookies
+        body: JSON.stringify({
+          pin: enteredPin,  
+          login_type: loginType,
+          ...(loginType === 'patient' && { username: username.trim() })
+        })
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || 'Authentication failed')
+      }
+
+      const userData = await res.json()
+
+      // Store ONLY minimal info for UI display
+      if (userData.role === 'patient') {
+        sessionStorage.setItem('patientName', userData.name)
+        sessionStorage.setItem('isAuthenticated', 'true')
+        nav('/portal')
+      } else if (userData.role === 'staff') {
+        sessionStorage.setItem('staffName', userData.name)
+        sessionStorage.setItem('isAuthenticated', 'true')
+        nav('/staff')
+      }
+      
+    } catch (err) {
+      alert(err.message || 'Authentication failed')
+      setPin('')
+    } finally {
+      setIsAuthenticating(false)
     }
   }
 
   const onKey = (k) => {
+    if (isAuthenticating) return // Stop input during authentication
+
     if (k === '⌫') {
       setPin(p => p.slice(0, -1))
       return
     }
-    if (k === 'Enter') {
-      if (role === 'patient') {
-        const okUser = username.trim().length > 0
-        const okPin = pin.length === 4
-        // Check against saved profile if it exists
-        const matchesSaved =
-          !savedPatient ||
-          (savedPatient.username?.toLowerCase() === username.trim().toLowerCase() &&
-           String(savedPatient.pin || '').padStart(4, '0') === pin)
-
-        if (okUser && okPin && matchesSaved) completeLogin()
-      } else {
-        if (pin.length === 4) completeLogin()
+    if (/[0-9]/.test(k) && pin.length < 4) {
+      const newPin = pin + k;
+      setPin(newPin); 
+      // Auto-submit when the 4th digit is entered
+      if (newPin.length === 4) {
+          authenticateUser(newPin, role); 
       }
       return
     }
-    if (/[0-9]/.test(k) && pin.length < 4) {
-      setPin(p => p + k)
+    
+    if (k === 'Enter' && pin.length === 4) {
+      authenticateUser(pin, role);
     }
   }
 
-  const onFpDone = () => completeLogin()
+  // const onFpDone = () => completeLogin()
+  const onFpDone = () => {
+    if (role === 'staff') nav('/staff')
+    else nav('/portal')
+  }
 
   const tile =
     "group rounded-3xl bg-[#6ec1af] hover:bg-emerald-800/70 transition-all " +

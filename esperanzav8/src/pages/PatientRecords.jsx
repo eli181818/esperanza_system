@@ -2,108 +2,174 @@
 // Page for health personnel to view and edit patient records, including search functionality.
 // Note: This is a different page from Records.jsx, which is for patients to view their own records.
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import backIcon from '../assets/back.png'
 import accIcon from '../assets/account.png'
 import historyIcon from '../assets/history.png'
 
-const BRAND = { bg: '#DCEBE8', text: '#406E65', border: '#BEE1DB' }
+const BRAND = {
+  bg: '#DCEBE8',
+  text: '#406E65',
+  border: '#BEE1DB',
+}
 
 export default function PatientRecords() {
   const nav = useNavigate()
 
-  const [profile, setProfile] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('patientProfile') || 'null') || {} } catch { return {} }
-  })
+  const [patients, setPatients] = useState([])
+  const [currentPatient, setCurrentPatient] = useState(null)
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [latestVitals, setLatestVitals] = useState(null)
+  const [history, setHistory] = useState([])
+  const [bpInput, setBpInput] = useState('')
 
-  const [latestVitals, setLatestVitals] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('latestVitals') || 'null') || null } catch { return null }
-  })
-
-  const [history, setHistory] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('vitalsHistory') || 'null') || [] } catch { return [] }
-  })
-
-  // Seed demo history if none exists yet
-  useEffect(() => {
-    if (!history.length && latestVitals) {
-      const seed = [{
-        date: new Date().toISOString().slice(0,10),
-        hr: latestVitals.heartRate ?? '—',
-        bp: latestVitals.bp ?? '—',
-        temp: latestVitals.temperature != null ? `${latestVitals.temperature} °C` : '—',
-        spo2: latestVitals.spo2 != null ? `${latestVitals.spo2}%` : '—',
-        height: latestVitals.height != null ? `${latestVitals.height} cm` : '—',
-        weight: latestVitals.weight != null ? `${latestVitals.weight} kg` : '—',
-        bmi: latestVitals.bmi != null ? `${latestVitals.bmi} kg/m²` : '—',
-      }]
-      localStorage.setItem('vitalsHistory', JSON.stringify(seed))
-      setHistory(seed)
+  const constructName = (patient) => {
+    if (patient.name) return patient.name
+    const parts = [patient.first_name, patient.middle_initial, patient.last_name].filter(Boolean)
+    if (patient.middle_initial) {
+      return `${patient.first_name} ${patient.middle_initial}. ${patient.last_name}`
     }
-  }, [history.length, latestVitals])
-
-  const matches = useMemo(() => {
-    if (!query) return profile?.name ? [profile] : []
-    const q = query.toLowerCase()
-    const ok =
-      profile?.name?.toLowerCase().includes(q) ||
-      profile?.patientId?.toLowerCase().includes(q)
-    return ok ? [profile] : []
-  }, [query, profile])
-
-  const saveProfile = () => {
-    localStorage.setItem('patientProfile', JSON.stringify(profile))
+    return parts.join(' ') || '—'
   }
 
-  const [bpInput, setBpInput] = useState('')
+  // Fetch all patients on mount
   useEffect(() => {
-    setBpInput((latestVitals?.bp ?? '').toString())
+    fetchPatients()
+  }, [])
+
+  const fetchPatients = async (searchTerm = '') => {
+    setLoading(true)
+    try {
+      const url = searchTerm
+        ? `http://localhost:8000/patients/?search=${encodeURIComponent(searchTerm)}`
+        : `http://localhost:8000/patients/`
+      const res = await fetch(url, {
+        credentials: 'include', // Include cookies for Django session
+      })
+      if (!res.ok) throw new Error('Failed to fetch patients')
+      const data = await res.json()
+      setPatients(data)
+    } catch (err) {
+      console.error('Failed to fetch patients:', err)
+      alert('Failed to fetch patients')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Automatically fetch vitals for the first patient
+  useEffect(() => {
+    if (patients.length > 0) {
+      const firstPatient = patients[0]
+      setCurrentPatient(firstPatient)
+      fetchVitals(firstPatient.id)
+    } else {
+      setLatestVitals(null)
+      setHistory([])
+    }
+  }, [patients])
+
+  // Reset BP input when editing changes
+  useEffect(() => {
+    setBpInput((latestVitals?.blood_pressure ?? '').toString())
   }, [editing, latestVitals])
 
-  const saveBp = () => {
-    if (!bpInput.trim()) return
-    const nextLatest = { ...(latestVitals || {}), bp: bpInput.trim() }
-    setLatestVitals(nextLatest)
-    localStorage.setItem('latestVitals', JSON.stringify(nextLatest))
+  // Fetch vitals for selected patient
+  const fetchVitals = async (patientId) => {
+    try {
+      const res = await fetch(`http://localhost:8000/patients/${patientId}/vitals/`, {
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error('Failed to fetch vitals')
+      const data = await res.json()
 
-    // Add or update today's bp entry in history
-    const today = new Date().toISOString().slice(0,10)
-    const idx = history.findIndex(h => h.date === today)
-    const newRow = {
-      date: today,
-      hr: nextLatest.heartRate ?? '—',
-      bp: bpInput.trim(),
-      temp: nextLatest.temperature != null ? `${nextLatest.temperature} °C` : '—',
-      spo2: nextLatest.spo2 != null ? `${nextLatest.spo2}%` : '—',
-      height: nextLatest.height != null ? `${nextLatest.height} cm` : '—',
-      weight: nextLatest.weight != null ? `${nextLatest.weight} kg` : '—',
-      bmi: nextLatest.bmi != null ? `${nextLatest.bmi} kg/m²` : '—',
+      if (data.latest) setLatestVitals(data.latest)
+      if (data.history) setHistory(data.history)
+    } catch (err) {
+      console.error('Failed to fetch vitals:', err)
     }
-    let nextHistory
-    if (idx >= 0) {
-      nextHistory = [...history]
-      nextHistory[idx] = { ...nextHistory[idx], ...newRow }
-    } else {
-      nextHistory = [newRow, ...history]
+  }
+
+  const handleSearch = () => {
+    fetchPatients(query)
+  }
+
+  const handleClear = () => {
+    setQuery('')
+    fetchPatients('')
+  }
+
+  const saveProfile = async () => {
+    if (!currentPatient) return
+    try {
+      const res = await fetch(`http://localhost:8000/patients/${currentPatient.id}/`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(currentPatient),
+      })
+      if (!res.ok) throw new Error('Failed to update patient')
+      alert('Patient record updated successfully')
+      setEditing(false)
+      fetchPatients(query)
+    } catch (err) {
+      console.error('Failed to save:', err)
+      alert('Failed to save record')
     }
-    setHistory(nextHistory)
-    localStorage.setItem('vitalsHistory', JSON.stringify(nextHistory))
+  }
+
+  const saveBp = async () => {
+    if (!bpInput.trim() || !currentPatient) return
+    
+    try {
+      // Create or update vital signs record with BP
+      const res = await fetch(`http://localhost:8000/patients/${currentPatient.id}/vitals/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          blood_pressure: bpInput.trim(),
+          date: new Date().toISOString().split('T')[0],
+        }),
+      })
+      
+      if (!res.ok) throw new Error('Failed to save blood pressure')
+      
+      alert('Blood pressure saved successfully')
+      // Refresh vitals to show updated data
+      fetchVitals(currentPatient.id)
+    } catch (err) {
+      console.error('Failed to save BP:', err)
+      alert('Failed to save blood pressure')
+    }
   }
 
   const handleFinish = () => {
     saveProfile()
-    setEditing(false)
-    nav('/records')
+  }
+
+  const startEditing = (patient) => {
+    const fullName = patient.name
+    || [patient.first_name, patient.middle_initial, patient.last_name].filter(Boolean).join(' ')
+    setCurrentPatient({
+      ...patient,
+      name: fullName,
+    })
+    setEditing(true)
+    fetchVitals(patient.id)
   }
 
   const Title = ({ children }) => (
     <h2
       className="text-3xl md:text-4xl font-extrabold tracking-tight text-center"
-      style={{ backgroundImage: `linear-gradient(90deg, ${BRAND.text}, #10B981)`,
-               WebkitBackgroundClip: 'text', color: 'transparent' }}
+      style={{
+        backgroundImage: `linear-gradient(90deg, ${BRAND.text}, #10B981)`,
+        WebkitBackgroundClip: 'text',
+        color: 'transparent',
+      }}
     >
       {children}
     </h2>
@@ -127,6 +193,7 @@ export default function PatientRecords() {
 
   return (
     <section className="relative mx-auto max-w-5xl px-2 py-16">
+      {/* Back */}
       <div className="absolute top-4 left-4">
         <button
           onClick={() => nav(-1)}
@@ -143,12 +210,13 @@ export default function PatientRecords() {
       <div className="mt-6 flex gap-3">
         <input
           value={query}
-          onChange={(e)=>setQuery(e.target.value)}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           placeholder="Search by Name or Patient ID…"
           className="w-full rounded-xl border border-slate-300 px-4 py-2.5"
         />
         <button
-          onClick={()=>setQuery('')}
+          onClick={handleClear}
           className="rounded-xl border border-slate-300 px-4 py-2.5 hover:bg-slate-50"
         >
           Clear
@@ -157,33 +225,34 @@ export default function PatientRecords() {
 
       {/* Results */}
       <div className="mt-6 space-y-6">
-        {(!matches.length) && (
+        {!loading && patients.length === 0 && (
           <div className="rounded-2xl border bg-white p-6 text-slate-600">No matches.</div>
         )}
 
-        {matches.map((p)=>(
-          <div key={p.patientId || 'active'} className="rounded-2xl border bg-white p-6">
-            {!editing ? (
+        {patients.map((p) => (
+          <div key={p.id} className="rounded-2xl border bg-white p-6">
+            {!editing || currentPatient?.id !== p.id ? (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h3 className="text-2xl font-extrabold" style={{ color: BRAND.text }}>
-                      {p.name || '—'}
+                      {constructName(p)}
                     </h3>
                     <p className="text-sm" style={{ color: BRAND.text }}>
-                      Patient ID: <span className="font-semibold">{p.patientId || '—'}</span> •&nbsp;
+                      Patient ID: <span className="font-semibold">{p.patient_id || '—'}</span> •&nbsp;
                       Contact: <span className="font-semibold">{p.contact || '—'}</span> •&nbsp;
                       Address: <span className="font-semibold">{p.address || '—'}</span>
                     </p>
                   </div>
                   <button
-                    onClick={()=>setEditing(true)}
+                    onClick={() => startEditing(p)}
                     className="rounded-xl px-4 py-2 font-semibold text-white"
                     style={{ background: BRAND.text }}
                   >
                     Edit
                   </button>
                 </div>
+
                 {/* Latest Vitals Card*/}
                 <div className="mt-6 grid gap-4 md:grid-cols-3">
                   <div className="rounded-2xl border p-5" style={{ background: BRAND.bg, color: BRAND.text, borderColor: BRAND.border }}>
@@ -205,20 +274,73 @@ export default function PatientRecords() {
               </>
             ) : (
               <>
-                {/* Personal Information */}
+                {/* Snapshot cards - now appear automatically; Appears when there are vitals captured 
+                {currentPatient?.id === p.id && latestVitals && (
+                  <div className="mt-6 grid gap-4 md:grid-cols-3">
+                    <div
+                      className="rounded-2xl border p-5"
+                      style={{
+                        background: BRAND.bg,
+                        color: BRAND.text,
+                        borderColor: BRAND.border,
+                      }}
+                    >
+                      <div className="text-sm opacity-90">Heart Rate</div>
+                      <div className="mt-2 text-3xl font-extrabold tabular-nums">
+                        {latestVitals?.heart_rate ?? '—'}
+                      </div>
+                      <div className="mt-1 text-xs opacity-80">BPM</div>
+                    </div>
+                    <div
+                      className="rounded-2xl border p-5"
+                      style={{
+                        background: BRAND.bg,
+                        color: BRAND.text,
+                        borderColor: BRAND.border,
+                      }}
+                    >
+                      <div className="text-sm opacity-90">Temperature</div>
+                      <div className="mt-2 text-3xl font-extrabold tabular-nums">
+                        {latestVitals?.temperature ?? '—'}
+                      </div>
+                      <div className="mt-1 text-xs opacity-80">°C</div>
+                    </div>
+                    <div
+                      className="rounded-2xl border p-5"
+                      style={{
+                        background: BRAND.bg,
+                        color: BRAND.text,
+                        borderColor: BRAND.border,
+                      }}
+                    >
+                      <div className="text-sm opacity-90">SpO₂</div>
+                      <div className="mt-2 text-3xl font-extrabold tabular-nums">
+                        {latestVitals?.spo2 ?? '—'}
+                      </div>
+                      <div className="mt-1 text-xs opacity-80">%</div>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : ( */}
+                {/* Edit form */}
                 <GradientHeader icon={accIcon}>Personal Information</GradientHeader>
 
-                <div className="mt-3 rounded-2xl overflow-hidden border" style={{ borderColor: BRAND.border }}>
+                <div
+                  className="mt-3 rounded-2xl overflow-hidden border relative"
+                  style={{ borderColor: BRAND.border }}
+                >
                   <img src={accIcon} alt="Account" className="absolute right-6 top-6 h-8 w-8 opacity-10" />
-                  {/* Table */}
                   <table className="min-w-full text-sm" style={{ background: BRAND.bg, color: BRAND.text }}>
                     <tbody>
                       <tr className="border-b" style={{ borderColor: BRAND.border }}>
                         <th className="px-4 py-3 text-left w-52">Patient Name</th>
                         <td className="px-4 py-3">
                           <input
-                            value={profile.name || ''}
-                            onChange={e => setProfile({ ...profile, name: e.target.value })}
+                            value={currentPatient.name || ''}
+                            onChange={(e) =>
+                              setCurrentPatient({ ...currentPatient, name: e.target.value })
+                            }
                             className="w-full rounded-lg border px-3 py-2 bg-white"
                             style={{ borderColor: BRAND.border }}
                             required
@@ -227,8 +349,10 @@ export default function PatientRecords() {
                         <th className="px-4 py-3 text-left w-40">Gender</th>
                         <td className="px-4 py-3">
                           <select
-                            value={profile.gender || 'Male'}
-                            onChange={e => setProfile({ ...profile, gender: e.target.value })}
+                            value={currentPatient.gender || 'Male'}
+                            onChange={(e) =>
+                              setCurrentPatient({ ...currentPatient, gender: e.target.value })
+                            }
                             className="w-full rounded-lg border px-3 py-2 bg-white"
                             style={{ borderColor: BRAND.border }}
                           >
@@ -242,8 +366,10 @@ export default function PatientRecords() {
                         <th className="px-4 py-3 text-left">Address</th>
                         <td className="px-4 py-3">
                           <input
-                            value={profile.address || ''}
-                            onChange={e => setProfile({ ...profile, address: e.target.value })}
+                            value={currentPatient.address || ''}
+                            onChange={(e) =>
+                              setCurrentPatient({ ...currentPatient, address: e.target.value })
+                            }
                             className="w-full rounded-lg border px-3 py-2 bg-white"
                             style={{ borderColor: BRAND.border }}
                           />
@@ -252,8 +378,10 @@ export default function PatientRecords() {
                         <td className="px-4 py-3">
                           <input
                             type="date"
-                            value={profile.dob || ''}
-                            onChange={e => setProfile({ ...profile, dob: e.target.value })}
+                            value={currentPatient.dob || ''}
+                            onChange={(e) =>
+                              setCurrentPatient({ ...currentPatient, dob: e.target.value })
+                            }
                             className="w-full rounded-lg border px-3 py-2 bg-white"
                             style={{ borderColor: BRAND.border }}
                           />
@@ -264,8 +392,10 @@ export default function PatientRecords() {
                         <th className="px-4 py-3 text-left">Contact Number</th>
                         <td className="px-4 py-3">
                           <input
-                            value={profile.contact || ''}
-                            onChange={e => setProfile({ ...profile, contact: e.target.value })}
+                            value={currentPatient.contact || ''}
+                            onChange={(e) =>
+                              setCurrentPatient({ ...currentPatient, contact: e.target.value })
+                            }
                             className="w-full rounded-lg border px-3 py-2 bg-white"
                             style={{ borderColor: BRAND.border }}
                           />
@@ -273,9 +403,9 @@ export default function PatientRecords() {
                         <th className="px-4 py-3 text-left">Patient ID</th>
                         <td className="px-4 py-3">
                           <input
-                            value={profile.patientId || ''}
-                            onChange={e => setProfile({ ...profile, patientId: e.target.value })}
-                            className="w-full rounded-lg border px-3 py-2 bg-white"
+                            value={currentPatient.patient_id || ''}
+                            disabled
+                            className="w-full rounded-lg border px-3 py-2 bg-slate-100"
                             style={{ borderColor: BRAND.border }}
                           />
                         </td>
@@ -284,36 +414,37 @@ export default function PatientRecords() {
                   </table>
                 </div>
 
-                {/* Blood Pressure Input (for staff) */}
+                {/* Blood Pressure Input Section */}
                 <div className="mt-6">
-                <SectionHeader>Blood Pressure</SectionHeader>
-                <div className="mt-3 rounded-2xl border p-4 flex items-center gap-3"
-                     style={{ borderColor: BRAND.border, background: BRAND.bg, color: BRAND.text }}>
-                  <label className="min-w-[10rem] font-semibold">BP (mmHg)</label>
-                  <input
-                    value={bpInput}
-                    onChange={(e)=>setBpInput(e.target.value)}
-                    placeholder="e.g. 120/80"
-                    className="rounded-lg border px-3 py-2 bg-white flex-1"
-                    style={{ borderColor: BRAND.border }}
-                  />
-                  <button
-                    type="button"
-                    onClick={saveBp}
-                    className="rounded-lg px-4 py-2 text-white font-semibold"
-                    style={{ background: BRAND.text }}
-                  >
-                    Save BP
-                  </button>
-                </div>
+                  <SectionHeader>Blood Pressure</SectionHeader>
+                  <div className="mt-3 rounded-2xl border p-4 flex items-center gap-3"
+                       style={{ borderColor: BRAND.border, background: BRAND.bg, color: BRAND.text }}>
+                    <label className="min-w-[10rem] font-semibold">BP (mmHg)</label>
+                    <input
+                      value={bpInput}
+                      onChange={(e) => setBpInput(e.target.value)}
+                      placeholder="e.g. 120/80"
+                      className="rounded-lg border px-3 py-2 bg-white flex-1"
+                      style={{ borderColor: BRAND.border }}
+                    />
+                    <button
+                      type="button"
+                      onClick={saveBp}
+                      className="rounded-lg px-4 py-2 text-white font-semibold"
+                      style={{ background: BRAND.text }}
+                    >
+                      Save BP
+                    </button>
+                  </div>
                 </div>
 
                 {/* Vital Signs History */}
                 <GradientHeader icon={historyIcon}>Vital Signs History</GradientHeader>
-
-                <div className="mt-3 rounded-2xl overflow-hidden border" style={{ borderColor: BRAND.border }}>
+                <div
+                  className="mt-3 rounded-2xl overflow-hidden border relative"
+                  style={{ borderColor: BRAND.border }}
+                >
                   <img src={historyIcon} alt="History" className="absolute right-6 top-6 h-8 w-8 opacity-10" />
-                  {/* Table */}
                   <table className="min-w-full text-sm" style={{ background: BRAND.bg, color: BRAND.text }}>
                     <thead style={{ background: '#cfe5e1' }}>
                       <tr>
@@ -333,23 +464,24 @@ export default function PatientRecords() {
                           <td className="px-4 py-3">{r.date}</td>
                           <td className="px-4 py-3">{r.height ?? '—'}</td>
                           <td className="px-4 py-3">{r.weight ?? '—'}</td>
-                          <td className="px-4 py-3">{r.hr ? `${r.hr} bpm` : '—'}</td>
+                          <td className="px-4 py-3">{r.heart_rate ? `${r.heart_rate} bpm` : '—'}</td>
                           <td className="px-4 py-3">{r.spo2 ?? '—'}</td>
-                          <td className="px-4 py-3">{r.temp ?? '—'}</td>
+                          <td className="px-4 py-3">{r.temperature ?? '—'}</td>
                           <td className="px-4 py-3">{r.bmi ?? '—'}</td>
-                          <td className="px-4 py-3">{r.bp ?? '—'}</td>
+                          <td className="px-4 py-3">{r.blood_pressure ?? '—'}</td>
                         </tr>
                       ))}
                       {!history.length && (
                         <tr>
-                          <td className="px-4 py-6 text-center" colSpan={8}>No history yet.</td>
+                          <td className="px-4 py-6 text-center" colSpan={8}>
+                            No history yet.
+                          </td>
                         </tr>
                       )}
                     </tbody>
                   </table>
                 </div>
-                
-                {/* Finish button */}
+
                 <div className="mt-6 flex justify-end">
                   <button
                     onClick={handleFinish}
