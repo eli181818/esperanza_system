@@ -8,7 +8,7 @@ router.register(r'vitals', VitalSignsViewSet)
 router.register(r'queue', QueueViewSet)
 
 urlpatterns = [ # endpoints
-    path('login/', login, name="login"), # handles login via PIN
+    path('login/', login, name="login"),
     path('logout/', logout, name="logout"),
     path('patient/profile/', get_patient_profile, name='patient_profile'),
     path('', include(router.urls)), # includes the viewsets for patients and vitals
