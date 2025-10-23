@@ -1,6 +1,6 @@
-// PatientRecords.jsx - Fixed version with proper save functionality
+// PatientRecords.jsx - With search query in URL
 import React, { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import backIcon from '../assets/back.png'
 import accIcon from '../assets/account.png'
 import historyIcon from '../assets/history.png'
@@ -13,11 +13,12 @@ const BRAND = {
 
 export default function PatientRecords() {
   const nav = useNavigate()
-  const { patientId } = useParams() // Get patientId from URL
+  const { patientId } = useParams() // Get patientId from URL route
+  const [searchParams, setSearchParams] = useSearchParams() // Get search query from URL
 
   const [patients, setPatients] = useState([])
   const [currentPatient, setCurrentPatient] = useState(null)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(searchParams.get('q') || '') // Initialize from URL
   const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(false)
   const [latestVitals, setLatestVitals] = useState(null)
@@ -33,10 +34,12 @@ export default function PatientRecords() {
     return parts.join(' ') || '—'
   }
 
-  // Fetch all patients on mount
+  // Fetch all patients on mount or when search params change
   useEffect(() => {
-    fetchPatients()
-  }, [])
+    const searchTerm = searchParams.get('q') || ''
+    setQuery(searchTerm)
+    fetchPatients(searchTerm)
+  }, [searchParams])
 
   const fetchPatients = async (searchTerm = '') => {
     setLoading(true)
@@ -106,15 +109,19 @@ export default function PatientRecords() {
   }
 
   const handleSearch = () => {
-    fetchPatients(query)
+    // Update URL with search query
+    if (query.trim()) {
+      setSearchParams({ q: query.trim() })
+    } else {
+      setSearchParams({})
+    }
   }
 
   const handleClear = () => {
     setQuery('')
-    fetchPatients('')
+    setSearchParams({}) // Clear search params from URL
   }
 
-  // FIXED: Properly split name and prepare data for Django
   const saveProfile = async () => {
     if (!currentPatient) return
     
@@ -143,14 +150,14 @@ export default function PatientRecords() {
         last_name: last_name,
         gender: currentPatient.gender || 'Male',
         address: currentPatient.address || '',
-        birthdate: currentPatient.birthdate || currentPatient.dob || null, // Handle both field names
+        birthdate: currentPatient.birthdate || currentPatient.dob || null,
         contact: currentPatient.contact || '',
-        pin: currentPatient.pin, // Required field
+        pin: currentPatient.pin,
         username: currentPatient.username || null,
         fingerprint_id: currentPatient.fingerprint_id || null,
       }
 
-      console.log('Saving patient data:', payload) // For debugging
+      console.log('Saving patient data:', payload)
 
       const res = await fetch(`http://localhost:8000/patients/${currentPatient.id}/`, {
         method: 'PUT',
@@ -167,7 +174,10 @@ export default function PatientRecords() {
 
       alert('Patient record updated successfully')
       setEditing(false)
-      fetchPatients(query) // Refresh the list
+      
+      // Refresh the list with current search query
+      const currentSearch = searchParams.get('q') || ''
+      fetchPatients(currentSearch)
     } catch (err) {
       console.error('Failed to save:', err)
       alert(`Failed to save record: ${err.message}`)
@@ -200,8 +210,13 @@ export default function PatientRecords() {
 
   const handleFinish = () => {
     saveProfile()
-    // Navigate back to main patient records page after saving
-    nav('/staff/patient-records', { replace: true })
+    // Navigate back preserving search query
+    const currentSearch = searchParams.get('q')
+    if (currentSearch) {
+      nav(`/staff/patient-records?q=${encodeURIComponent(currentSearch)}`, { replace: true })
+    } else {
+      nav('/staff/patient-records', { replace: true })
+    }
   }
 
   const startEditing = (patient) => {
@@ -210,13 +225,18 @@ export default function PatientRecords() {
     setCurrentPatient({
       ...patient,
       name: fullName,
-      birthdate: patient.birthdate || patient.dob, // Normalize field name
+      birthdate: patient.birthdate || patient.dob,
     })
     setEditing(true)
     fetchVitals(patient.id)
     
-    // Update URL to include patient ID
-    nav(`/staff/patient-records/${patient.patient_id}`, { replace: true })
+    // Update URL to include patient ID while preserving search query
+    const currentSearch = searchParams.get('q')
+    if (currentSearch) {
+      nav(`/staff/patient-records/${patient.patient_id}?q=${encodeURIComponent(currentSearch)}`, { replace: true })
+    } else {
+      nav(`/staff/patient-records/${patient.patient_id}`, { replace: true })
+    }
   }
 
   const Title = ({ children }) => (
