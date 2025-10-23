@@ -42,18 +42,6 @@ export default function Register() {
     return `${year}-${m}-${d}`
   }, [month, day, year])
 
-  // // Generate Patient ID "P-YYYYMMDD-XXX"
-  // const makePatientId = () => {
-  //   const today = new Date()
-  //   const y = today.getFullYear()
-  //   const m = String(today.getMonth() + 1).padStart(2, '0')
-  //   const d = String(today.getDate()).padStart(2, '0')
-  //   const last = parseInt(localStorage.getItem('patientIdSeq') || '0', 10) || 0
-  //   const nextNum = (last % 999) + 1
-  //   localStorage.setItem('patientIdSeq', String(nextNum))
-  //   return `P-${y}${m}${d}-${String(nextNum).padStart(3, '0')}`
-  // }
-
   // Fingerprint capture (demo)
   const startFingerprintCapture = async () => {
     setFpStatus('capturing')

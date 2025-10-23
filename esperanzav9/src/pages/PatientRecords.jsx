@@ -1,6 +1,6 @@
 // PatientRecords.jsx - Fixed version with proper save functionality
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import backIcon from '../assets/back.png'
 import accIcon from '../assets/account.png'
 import historyIcon from '../assets/history.png'
@@ -13,6 +13,7 @@ const BRAND = {
 
 export default function PatientRecords() {
   const nav = useNavigate()
+  const { patientId } = useParams() // Get patientId from URL
 
   const [patients, setPatients] = useState([])
   const [currentPatient, setCurrentPatient] = useState(null)
@@ -57,17 +58,31 @@ export default function PatientRecords() {
     }
   }
 
-  // Automatically fetch vitals for the first patient
+  // Automatically fetch vitals for the first patient OR the patient from URL
   useEffect(() => {
     if (patients.length > 0) {
-      const firstPatient = patients[0]
-      setCurrentPatient(firstPatient)
-      fetchVitals(firstPatient.id)
+      // If there's a patientId in the URL, find and edit that patient
+      if (patientId) {
+        const patientToEdit = patients.find(p => p.patient_id === parseInt(patientId))
+        if (patientToEdit) {
+          startEditing(patientToEdit)
+        } else {
+          // Patient not found, show first patient
+          const firstPatient = patients[0]
+          setCurrentPatient(firstPatient)
+          fetchVitals(firstPatient.id)
+        }
+      } else {
+        // No patientId in URL, just show first patient
+        const firstPatient = patients[0]
+        setCurrentPatient(firstPatient)
+        fetchVitals(firstPatient.id)
+      }
     } else {
       setLatestVitals(null)
       setHistory([])
     }
-  }, [patients])
+  }, [patients, patientId])
 
   // Reset BP input when editing changes
   useEffect(() => {
@@ -185,6 +200,8 @@ export default function PatientRecords() {
 
   const handleFinish = () => {
     saveProfile()
+    // Navigate back to main patient records page after saving
+    nav('/staff/patient-records', { replace: true })
   }
 
   const startEditing = (patient) => {
@@ -197,6 +214,9 @@ export default function PatientRecords() {
     })
     setEditing(true)
     fetchVitals(patient.id)
+    
+    // Update URL to include patient ID
+    nav(`/staff/patient-records/${patient.patient_id}`, { replace: true })
   }
 
   const Title = ({ children }) => (

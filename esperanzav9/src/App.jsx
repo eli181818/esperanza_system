@@ -50,9 +50,9 @@ export default function App() {
           <Route path="/vitals/height" element={<Height />} />
           <Route path="/vitals/pulse" element={<Pulse />} />
           <Route path="/vitals/temperature" element={<Temperature />} />
-          <Route path="/records" element={<Records />} />
+          <Route path="/records/:username?" element={<Records />} />
           <Route path="/staff" element={<Staff />} />
-          <Route path="/staff/patient-records" element={<PatientRecords />} />
+          <Route path="/staff/patient-records/:patientId?" element={<PatientRecords />} />
           <Route path="/staff/QueueManagement" element={<QueueManagement />} />
           <Route path="/staff/reports" element={<Reports />} />
         </Routes>

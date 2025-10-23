@@ -2,7 +2,7 @@
 // Page for patients to DISPLAY patient records and vitals
 
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import heartRateIcon from '../assets/heart-rate.png'
 import temperatureIcon from '../assets/thermometer.png'
 import bloodPressureIcon from '../assets/blood-pressure.png'
@@ -18,6 +18,7 @@ export default function Records() {
   const [latest, setLatest] = useState(null)
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
+  const { username } = useParams();
   const nav = useNavigate()
 
   const calcAge = (dobStr) => {
@@ -66,6 +67,10 @@ export default function Records() {
           dob: patientData.birthdate,
           age: calculatedAge
         })
+
+        if (patientData.username && username !== patientData.username) {
+          nav(`/records/${patientData.username}`, { replace: true })
+        }
 
         // Fetch vitals from backend
         const vitalsRes = await fetch('http://localhost:8000/patient/vitals/', {
