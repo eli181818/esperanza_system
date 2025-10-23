@@ -1,7 +1,4 @@
-// PatientRecords.jsx
-// Page for health personnel to view and edit patient records, including search functionality.
-// Note: This is a different page from Records.jsx, which is for patients to view their own records.
-
+// PatientRecords.jsx - Fixed version with proper save functionality
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import backIcon from '../assets/back.png'
@@ -47,7 +44,7 @@ export default function PatientRecords() {
         ? `http://localhost:8000/patients/?search=${encodeURIComponent(searchTerm)}`
         : `http://localhost:8000/patients/`
       const res = await fetch(url, {
-        credentials: 'include', // Include cookies for Django session
+        credentials: 'include',
       })
       if (!res.ok) throw new Error('Failed to fetch patients')
       const data = await res.json()
@@ -102,22 +99,63 @@ export default function PatientRecords() {
     fetchPatients('')
   }
 
+  // FIXED: Properly split name and prepare data for Django
   const saveProfile = async () => {
     if (!currentPatient) return
+    
     try {
+      // Split the full name into parts
+      const nameParts = (currentPatient.name || '').trim().split(/\s+/)
+      let first_name = ''
+      let middle_initial = ''
+      let last_name = ''
+      
+      if (nameParts.length === 1) {
+        first_name = nameParts[0]
+      } else if (nameParts.length === 2) {
+        first_name = nameParts[0]
+        last_name = nameParts[1]
+      } else if (nameParts.length >= 3) {
+        first_name = nameParts[0]
+        middle_initial = nameParts[1]
+        last_name = nameParts.slice(2).join(' ')
+      }
+
+      // Prepare data matching Django model fields
+      const payload = {
+        first_name: first_name,
+        middle_initial: middle_initial,
+        last_name: last_name,
+        gender: currentPatient.gender || 'Male',
+        address: currentPatient.address || '',
+        birthdate: currentPatient.birthdate || currentPatient.dob || null, // Handle both field names
+        contact: currentPatient.contact || '',
+        pin: currentPatient.pin, // Required field
+        username: currentPatient.username || null,
+        fingerprint_id: currentPatient.fingerprint_id || null,
+      }
+
+      console.log('Saving patient data:', payload) // For debugging
+
       const res = await fetch(`http://localhost:8000/patients/${currentPatient.id}/`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(currentPatient),
+        body: JSON.stringify(payload),
       })
-      if (!res.ok) throw new Error('Failed to update patient')
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        console.error('Error response:', errorData)
+        throw new Error(errorData.detail || 'Failed to update patient')
+      }
+
       alert('Patient record updated successfully')
       setEditing(false)
-      fetchPatients(query)
+      fetchPatients(query) // Refresh the list
     } catch (err) {
       console.error('Failed to save:', err)
-      alert('Failed to save record')
+      alert(`Failed to save record: ${err.message}`)
     }
   }
 
@@ -125,7 +163,6 @@ export default function PatientRecords() {
     if (!bpInput.trim() || !currentPatient) return
     
     try {
-      // Create or update vital signs record with BP
       const res = await fetch(`http://localhost:8000/patients/${currentPatient.id}/vitals/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -139,7 +176,6 @@ export default function PatientRecords() {
       if (!res.ok) throw new Error('Failed to save blood pressure')
       
       alert('Blood pressure saved successfully')
-      // Refresh vitals to show updated data
       fetchVitals(currentPatient.id)
     } catch (err) {
       console.error('Failed to save BP:', err)
@@ -157,6 +193,7 @@ export default function PatientRecords() {
     setCurrentPatient({
       ...patient,
       name: fullName,
+      birthdate: patient.birthdate || patient.dob, // Normalize field name
     })
     setEditing(true)
     fetchVitals(patient.id)
@@ -274,55 +311,6 @@ export default function PatientRecords() {
               </>
             ) : (
               <>
-                {/* Snapshot cards - now appear automatically; Appears when there are vitals captured 
-                {currentPatient?.id === p.id && latestVitals && (
-                  <div className="mt-6 grid gap-4 md:grid-cols-3">
-                    <div
-                      className="rounded-2xl border p-5"
-                      style={{
-                        background: BRAND.bg,
-                        color: BRAND.text,
-                        borderColor: BRAND.border,
-                      }}
-                    >
-                      <div className="text-sm opacity-90">Heart Rate</div>
-                      <div className="mt-2 text-3xl font-extrabold tabular-nums">
-                        {latestVitals?.heart_rate ?? '—'}
-                      </div>
-                      <div className="mt-1 text-xs opacity-80">BPM</div>
-                    </div>
-                    <div
-                      className="rounded-2xl border p-5"
-                      style={{
-                        background: BRAND.bg,
-                        color: BRAND.text,
-                        borderColor: BRAND.border,
-                      }}
-                    >
-                      <div className="text-sm opacity-90">Temperature</div>
-                      <div className="mt-2 text-3xl font-extrabold tabular-nums">
-                        {latestVitals?.temperature ?? '—'}
-                      </div>
-                      <div className="mt-1 text-xs opacity-80">°C</div>
-                    </div>
-                    <div
-                      className="rounded-2xl border p-5"
-                      style={{
-                        background: BRAND.bg,
-                        color: BRAND.text,
-                        borderColor: BRAND.border,
-                      }}
-                    >
-                      <div className="text-sm opacity-90">SpO₂</div>
-                      <div className="mt-2 text-3xl font-extrabold tabular-nums">
-                        {latestVitals?.spo2 ?? '—'}
-                      </div>
-                      <div className="mt-1 text-xs opacity-80">%</div>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : ( */}
                 {/* Edit form */}
                 <GradientHeader icon={accIcon}>Personal Information</GradientHeader>
 
@@ -378,9 +366,9 @@ export default function PatientRecords() {
                         <td className="px-4 py-3">
                           <input
                             type="date"
-                            value={currentPatient.dob || ''}
+                            value={currentPatient.birthdate || ''}
                             onChange={(e) =>
-                              setCurrentPatient({ ...currentPatient, dob: e.target.value })
+                              setCurrentPatient({ ...currentPatient, birthdate: e.target.value })
                             }
                             className="w-full rounded-lg border px-3 py-2 bg-white"
                             style={{ borderColor: BRAND.border }}
@@ -465,9 +453,9 @@ export default function PatientRecords() {
                           <td className="px-4 py-3">{r.height ?? '—'}</td>
                           <td className="px-4 py-3">{r.weight ?? '—'}</td>
                           <td className="px-4 py-3">{r.heart_rate ? `${r.heart_rate} bpm` : '—'}</td>
-                          <td className="px-4 py-3">{r.spo2 ?? '—'}</td>
+                          <td className="px-4 py-3">{r.oxygen_saturation ?? '—'}</td>
                           <td className="px-4 py-3">{r.temperature ?? '—'}</td>
-                          <td className="px-4 py-3">{r.bmi ?? '—'}</td>
+                          <td className="px-4 py-3">{r.BMI ?? '—'}</td>
                           <td className="px-4 py-3">{r.blood_pressure ?? '—'}</td>
                         </tr>
                       ))}
