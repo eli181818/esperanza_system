@@ -8,12 +8,12 @@ class HCStaff(models.Model):
     staff_pin = models.CharField(max_length=4, unique=True)
 
 class Patient(models.Model):    
-    patient_id = models.CharField(max_length=20, unique=True)
+    patient_id = models.CharField(max_length=15, unique=True)
     first_name = models.CharField(max_length=100)
-    middle_initial = models.CharField(max_length=100, null=True, blank=True)
-    last_name = models.CharField(max_length=100)
+    middle_initial = models.CharField(max_length=1, null=True, blank=True)
+    last_name = models.CharField(max_length=50)
     age = models.IntegerField(null=True, blank=True)
-    gender = models.CharField(max_length=6, choices=[('Male', 'Male'), ('Female', 'Female')])
+    sex = models.CharField(max_length=6, choices=[('Male', 'Male'), ('Female', 'Female')])
     contact = models.CharField(max_length=11, default='N/A')
     address = models.TextField(max_length=450)
     username = models.CharField(max_length=50, null=True, blank=True, unique=True)
