@@ -1,8 +1,5 @@
-// Reports.jsx
-// This page displays recent vitals and visit summaries for patients,
-// allowing healthcare personnel to review patient history.
-
-import React, { useMemo, useState } from 'react'
+// Reports.jsx - Connected to Database
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import backIcon from '../assets/back.png'
 import accIcon from '../assets/account.png'
@@ -25,67 +22,93 @@ const calcAge = (dobStr) => {
 export default function Reports() {
   const nav = useNavigate()
   const [query, setQuery] = useState('')
+  const [patients, setPatients] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  // Active profile (from localStorage or default)
-  const profile = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem('patientProfile') || 'null') } catch { return null }
-  }, []) || {
-    name: 'JUAN DC',
-    gender: 'Male',
-    address: '123 Manila St.',
-    contact: '09451581553',
-    dob: '2004-01-20',
+  useEffect(() => {
+    fetchPatients()
+  }, [])
+
+  const fetchPatients = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('http://localhost:8000/patients/', {
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error('Failed to fetch patients')
+      const data = await res.json()
+      setPatients(data)
+    } catch (err) {
+      console.error('Failed to fetch patients:', err)
+      alert('Failed to fetch patient records')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const age = calcAge(profile.dob)
-  const birthdate = profile.dob
-    ? new Date(profile.dob).toLocaleDateString()
-    : '—'
-
-  // Build simple rows for the table, modify this to include more data if available
-  const rows = useMemo(() => {
-    // Load from localStorage
-    const hist = (() => {
-      try { return JSON.parse(localStorage.getItem('vitalsHistory') || '[]') } catch { return [] }
-    })()
-
-    if (hist.length === 0) {
-      return Array.from({ length: 10 }, (_, i) => ({
-        id: i,
-        date: '01/18/2005',
-        name: profile.name,
-        gender: profile.gender || '—',
-        age: age ?? '—',
-        birthdate,
-        address: profile.address || '—',
-        contact: profile.contact || '—',
-      }))
+  const constructName = (patient) => {
+    const parts = [patient.first_name, patient.middle_initial, patient.last_name].filter(Boolean)
+    if (patient.middle_initial) {
+      return `${patient.first_name} ${patient.middle_initial}. ${patient.last_name}`
     }
+    return parts.join(' ') || '—'
+  }
 
-    return hist.map((r, i) => ({
-      id: r.id || i,
-      date: r.date || '—',
-      name: r.name || profile.name || '—',
-      gender: profile.gender || '—',
-      age: age ?? '—',
-      birthdate,
-      address: profile.address || '—',
-      contact: profile.contact || '—',
-    }))
-  }, [profile, age, birthdate])
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—'
+    try {
+      const date = new Date(dateStr)
+      return date.toLocaleDateString('en-US', { 
+        month: '2-digit', 
+        day: '2-digit', 
+        year: 'numeric' 
+      })
+    } catch {
+      return '—'
+    }
+  }
 
-  const filtered = rows.filter(r => {
+  const formatDateTime = (dateTimeStr) => {
+    if (!dateTimeStr) return '—'
+    try {
+      const date = new Date(dateTimeStr)
+      return date.toLocaleDateString('en-US', { 
+        month: '2-digit', 
+        day: '2-digit', 
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch {
+      return '—'
+    }
+  }
+
+  const rows = patients.map((patient) => ({
+    id: patient.id,
+    patientId: patient.patient_id,
+    name: constructName(patient),
+    sex: patient.sex || '—',
+    age: calcAge(patient.birthdate) ?? '—',
+    birthdate: formatDate(patient.birthdate),
+    address: patient.address || '—',
+    contact: patient.contact || '—',
+    lastVisit: formatDateTime(patient.last_visit),
+  }))
+
+  const filtered = rows.filter((r) => {
     const q = query.trim().toLowerCase()
     if (!q) return true
     return (
       r.name.toLowerCase().includes(q) ||
+      r.patientId.toLowerCase().includes(q) ||
       r.address.toLowerCase().includes(q) ||
       r.contact.toLowerCase().includes(q)
     )
   })
 
   return (
-    <section className="relative mx-auto max-w-6xl px-4 py-16">
+    <section className="relative mx-auto max-w-7xl px-4 py-16">
       {/* Back */}
       <div className="absolute top-4 left-4">
         <button
@@ -98,51 +121,48 @@ export default function Reports() {
       </div>
 
       {/* Page title */}
-      <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-600 via-teal-600 to-slate-700 bg-clip-text text-transparent text-center"
-      >
+      <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-600 via-teal-600 to-slate-700 bg-clip-text text-transparent text-center">
         Patient Records
       </h2>
 
       {/* Header bar and search */}
-        <div
-          className="mt-6 rounded-2xl border shadow-sm"
-          style={{ background: 'white' }}
-        >
-          <div className="flex flex-col md:flex-row items-center md:justify-between gap-4 p-6">
-            <h3 className="text-2xl font-extrabold text-slate-900 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 bg-clip-text text-transparent text-center md:text-left w-full md:w-auto">
-          <img src={accIcon} alt="Profile" className="inline h-8 w-8 object-contain mr-2" />
-          Esperanza Patient Record
-            </h3>
-            <div className="w-full md:w-1/2 flex justify-end">
-          <div className="relative w-full md:w-80">
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search name, address or contact…"
-              className="w-full rounded-full px-4 py-2 outline-none shadow-inner pr-10"
-              style={{
-            background: TABLE_BG,
-            color: TEAL,
-            border: `1px solid ${TEAL}20`,
-              }}
-            />
-            <img
-              src={searchIcon}
-              alt="Search"
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 opacity-70 pointer-events-none"
-            />
-          </div>
+      <div className="mt-6 rounded-2xl border shadow-sm" style={{ background: 'white' }}>
+        <div className="flex flex-col md:flex-row items-center md:justify-between gap-4 p-6">
+          <h3 className="text-2xl font-extrabold text-slate-900 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 bg-clip-text text-transparent text-center md:text-left w-full md:w-auto">
+            <img src={accIcon} alt="Profile" className="inline h-8 w-8 object-contain mr-2" />
+            Esperanza Patient Record
+          </h3>
+          <div className="w-full md:w-1/2 flex justify-end">
+            <div className="relative w-full md:w-80">
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search name, ID, address or contact…"
+                className="w-full rounded-full px-4 py-2 outline-none shadow-inner pr-10"
+                style={{
+                  background: TABLE_BG,
+                  color: TEAL,
+                  border: `1px solid ${TEAL}20`,
+                }}
+              />
+              <img
+                src={searchIcon}
+                alt="Search"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 opacity-70 pointer-events-none"
+              />
             </div>
           </div>
+        </div>
 
-          {/* Table */}
+        {/* Table */}
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
               <tr style={{ background: TABLE_BG, color: TEAL }}>
-                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Last Visit</th>
+                <th className="px-4 py-3">Patient ID</th>
                 <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Gender</th>
+                <th className="px-4 py-3">Sex</th>
                 <th className="px-4 py-3">Age</th>
                 <th className="px-4 py-3">Birthdate</th>
                 <th className="px-4 py-3">Address</th>
@@ -150,23 +170,31 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody style={{ background: TABLE_BG, color: TEAL }}>
-              {filtered.map((r) => (
-                <tr key={r.id} className="border-t" style={{ borderColor: '#406E651A' }}>
-                  <td className="px-4 py-3">{r.date}</td>
-                  <td className="px-4 py-3">{r.name}</td>
-                  <td className="px-4 py-3">{r.gender}</td>
-                  <td className="px-4 py-3">{r.age}</td>
-                  <td className="px-4 py-3">{r.birthdate}</td>
-                  <td className="px-4 py-3">{r.address}</td>
-                  <td className="px-4 py-3">{r.contact}</td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
+              {loading ? (
                 <tr>
-                  <td className="px-4 py-6 text-center" colSpan={7}>
-                    No results.
+                  <td className="px-4 py-6 text-center" colSpan={8}>
+                    Loading patient records...
                   </td>
                 </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-6 text-center" colSpan={8}>
+                    No results found.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((r) => (
+                  <tr key={r.id} className="border-t hover:bg-white/50 transition-colors" style={{ borderColor: '#406E651A' }}>
+                    <td className="px-4 py-3 font-semibold">{r.lastVisit}</td>
+                    <td className="px-4 py-3 font-semibold">{r.patientId}</td>
+                    <td className="px-4 py-3 font-medium">{r.name}</td>
+                    <td className="px-4 py-3">{r.sex}</td>
+                    <td className="px-4 py-3">{r.age}</td>
+                    <td className="px-4 py-3">{r.birthdate}</td>
+                    <td className="px-4 py-3">{r.address}</td>
+                    <td className="px-4 py-3">{r.contact}</td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>

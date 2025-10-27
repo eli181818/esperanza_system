@@ -20,6 +20,7 @@ class Patient(models.Model):
     birthdate = models.DateField(null=True, blank=True)
     pin = models.CharField(max_length=4)
     fingerprint_id = models.CharField(max_length=4, null=True, blank=True, unique=True)
+    last_visit = models.DateTimeField(null=True, blank=True)
 
     def save(self, *args, **kwargs):  # Calculate age
         if self.birthdate:
@@ -73,14 +74,18 @@ class QueueEntry(models.Model):
         ('NORMAL', 'Normal'),
     ]
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='queue_entries')
-    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, null=True, blank=True)  # Allow null initially
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, null=True, blank=True)
     entered_at = models.DateTimeField(default=timezone.now)
     queue_number = models.CharField(max_length=10, null=True, blank=True)
     
     class Meta:
-        ordering = ['-entered_at']  # Default sort by newest first, but we'll override for priority in views
+        ordering = ['-entered_at']
     
     def save(self, *args, **kwargs):
+        # ✅ UPDATE LAST VISIT when entering queue
+        self.patient.last_visit = timezone.now()
+        self.patient.save()
+        
         # Auto-compute priority on save (if not set)
         if not self.priority:
             self.priority = compute_patient_priority(self.patient)
