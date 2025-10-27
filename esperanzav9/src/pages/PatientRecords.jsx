@@ -1,4 +1,4 @@
-// PatientRecords.jsx - With search query in URL
+// PatientRecords.jsx - Fixed version
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import backIcon from '../assets/back.png'
@@ -13,12 +13,12 @@ const BRAND = {
 
 export default function PatientRecords() {
   const nav = useNavigate()
-  const { patientId } = useParams() // Get patientId from URL route
-  const [searchParams, setSearchParams] = useSearchParams() // Get search query from URL
+  const { patientId } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [patients, setPatients] = useState([])
   const [currentPatient, setCurrentPatient] = useState(null)
-  const [query, setQuery] = useState(searchParams.get('q') || '') // Initialize from URL
+  const [query, setQuery] = useState(searchParams.get('q') || '')
   const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(false)
   const [latestVitals, setLatestVitals] = useState(null)
@@ -34,7 +34,6 @@ export default function PatientRecords() {
     return parts.join(' ') || '—'
   }
 
-  // Fetch all patients on mount or when search params change
   useEffect(() => {
     const searchTerm = searchParams.get('q') || ''
     setQuery(searchTerm)
@@ -61,44 +60,43 @@ export default function PatientRecords() {
     }
   }
 
-  // Automatically fetch vitals for the first patient OR the patient from URL
   useEffect(() => {
-    if (patients.length > 0) {
-      // If there's a patientId in the URL, find and edit that patient
+    if (patients.length > 0 && !editing) {
       if (patientId) {
         const patientToEdit = patients.find(p => p.patient_id === parseInt(patientId))
         if (patientToEdit) {
           startEditing(patientToEdit)
         } else {
-          // Patient not found, show first patient
           const firstPatient = patients[0]
           setCurrentPatient(firstPatient)
           fetchVitals(firstPatient.id)
         }
       } else {
-        // No patientId in URL, just show first patient
         const firstPatient = patients[0]
         setCurrentPatient(firstPatient)
         fetchVitals(firstPatient.id)
       }
-    } else {
+    } else if (patients.length === 0) {
+      setCurrentPatient(null)
       setLatestVitals(null)
       setHistory([])
     }
   }, [patients, patientId])
 
-  // Reset BP input when editing changes
   useEffect(() => {
     setBpInput((latestVitals?.blood_pressure ?? '').toString())
   }, [editing, latestVitals])
 
-  // Fetch vitals for selected patient
-  const fetchVitals = async (patientId) => {
+  // FIXED: Use patient.id (database ID) not patient_id
+  const fetchVitals = async (databaseId) => {
     try {
-      const res = await fetch(`http://localhost:8000/patients/${patientId}/vitals/`, {
+      const res = await fetch(`http://localhost:8000/patients/${databaseId}/vitals/`, {
         credentials: 'include',
       })
-      if (!res.ok) throw new Error('Failed to fetch vitals')
+      if (!res.ok) {
+        console.error('Failed to fetch vitals:', res.status)
+        return
+      }
       const data = await res.json()
 
       if (data.latest) setLatestVitals(data.latest)
@@ -109,7 +107,6 @@ export default function PatientRecords() {
   }
 
   const handleSearch = () => {
-    // Update URL with search query
     if (query.trim()) {
       setSearchParams({ q: query.trim() })
     } else {
@@ -119,48 +116,40 @@ export default function PatientRecords() {
 
   const handleClear = () => {
     setQuery('')
-    setSearchParams({}) // Clear search params from URL
+    setSearchParams({})
   }
 
   const saveProfile = async () => {
     if (!currentPatient) return
     
     try {
-      // Split the full name into parts
-      const nameParts = (currentPatient.name || '').trim().split(/\s+/)
-      let first_name = ''
-      let middle_initial = ''
-      let last_name = ''
-      
-      if (nameParts.length === 1) {
-        first_name = nameParts[0]
-      } else if (nameParts.length === 2) {
-        first_name = nameParts[0]
-        last_name = nameParts[1]
-      } else if (nameParts.length >= 3) {
-        first_name = nameParts[0]
-        middle_initial = nameParts[1]
-        last_name = nameParts.slice(2).join(' ')
-      }
+      // Use the separate fields directly
+      const first_name = (currentPatient.first_name || '').trim()
+      const middle_initial = (currentPatient.middle_initial || '').trim().charAt(0) // Only first character
+      const last_name = (currentPatient.last_name || '').trim()
 
-      // Prepare data matching Django model fields
+      // Build payload - explicitly exclude pin, patient_id, and other read-only fields
       const payload = {
-        first_name: first_name,
-        middle_initial: middle_initial,
-        last_name: last_name,
-        gender: currentPatient.gender || 'Male',
+        first_name: first_name || 'Unknown',
+        last_name: last_name || 'Unknown', // Cannot be blank
+        sex: currentPatient.sex || 'Male',
         address: currentPatient.address || '',
-        birthdate: currentPatient.birthdate || currentPatient.dob || null,
         contact: currentPatient.contact || '',
-        pin: currentPatient.pin,
-        username: currentPatient.username || null,
-        fingerprint_id: currentPatient.fingerprint_id || null,
+        pin: currentPatient.pin, // Include existing pin to satisfy required field
+      }
+      
+      // Only add optional fields if they have values
+      if (middle_initial) {
+        payload.middle_initial = middle_initial
+      }
+      if (currentPatient.birthdate) {
+        payload.birthdate = currentPatient.birthdate
       }
 
       console.log('Saving patient data:', payload)
 
       const res = await fetch(`http://localhost:8000/patients/${currentPatient.id}/`, {
-        method: 'PUT',
+        method: 'PATCH', // Changed from PUT to PATCH - only updates provided fields
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(payload),
@@ -169,13 +158,26 @@ export default function PatientRecords() {
       if (!res.ok) {
         const errorData = await res.json()
         console.error('Error response:', errorData)
-        throw new Error(errorData.detail || 'Failed to update patient')
+        console.error('Full error details:', JSON.stringify(errorData, null, 2))
+        
+        // Show detailed error message
+        let errorMsg = 'Failed to update patient'
+        if (errorData.detail) {
+          errorMsg = errorData.detail
+        } else if (typeof errorData === 'object') {
+          // Show field-specific errors
+          const errors = Object.entries(errorData).map(([field, msgs]) => 
+            `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`
+          ).join('\n')
+          errorMsg = errors || errorMsg
+        }
+        
+        throw new Error(errorMsg)
       }
 
       alert('Patient record updated successfully')
       setEditing(false)
       
-      // Refresh the list with current search query
       const currentSearch = searchParams.get('q') || ''
       fetchPatients(currentSearch)
     } catch (err) {
@@ -210,7 +212,6 @@ export default function PatientRecords() {
 
   const handleFinish = () => {
     saveProfile()
-    // Navigate back preserving search query
     const currentSearch = searchParams.get('q')
     if (currentSearch) {
       nav(`/staff/patient-records?q=${encodeURIComponent(currentSearch)}`, { replace: true })
@@ -220,17 +221,21 @@ export default function PatientRecords() {
   }
 
   const startEditing = (patient) => {
-    const fullName = patient.name
-    || [patient.first_name, patient.middle_initial, patient.last_name].filter(Boolean).join(' ')
-    setCurrentPatient({
+    const patientToEdit = {
       ...patient,
-      name: fullName,
-      birthdate: patient.birthdate || patient.dob,
-    })
+      first_name: patient.first_name || '',
+      middle_initial: patient.middle_initial || '',
+      last_name: patient.last_name || '',
+      sex: patient.sex || patient.gender || 'Male',
+      birthdate: patient.birthdate || patient.dob || '',
+    }
+    
+    setCurrentPatient(patientToEdit)
     setEditing(true)
+    
+    // Fetch vitals for this patient
     fetchVitals(patient.id)
     
-    // Update URL to include patient ID while preserving search query
     const currentSearch = searchParams.get('q')
     if (currentSearch) {
       nav(`/staff/patient-records/${patient.patient_id}?q=${encodeURIComponent(currentSearch)}`, { replace: true })
@@ -270,7 +275,6 @@ export default function PatientRecords() {
 
   return (
     <section className="relative mx-auto max-w-5xl px-2 py-16">
-      {/* Back */}
       <div className="absolute top-4 left-4">
         <button
           onClick={() => nav(-1)}
@@ -283,7 +287,6 @@ export default function PatientRecords() {
 
       <Title>Patient Records</Title>
 
-      {/* Search */}
       <div className="mt-6 flex gap-3">
         <input
           value={query}
@@ -300,7 +303,6 @@ export default function PatientRecords() {
         </button>
       </div>
 
-      {/* Results */}
       <div className="mt-6 space-y-6">
         {!loading && patients.length === 0 && (
           <div className="rounded-2xl border bg-white p-6 text-slate-600">No matches.</div>
@@ -316,8 +318,8 @@ export default function PatientRecords() {
                       {constructName(p)}
                     </h3>
                     <p className="text-sm" style={{ color: BRAND.text }}>
-                      Patient ID: <span className="font-semibold">{p.patient_id || '—'}</span> •&nbsp;
-                      Contact: <span className="font-semibold">{p.contact || '—'}</span> •&nbsp;
+                      Patient ID: <span className="font-semibold">{p.patient_id || '—'}</span> • 
+                      Contact: <span className="font-semibold">{p.contact || '—'}</span> • 
                       Address: <span className="font-semibold">{p.address || '—'}</span>
                     </p>
                   </div>
@@ -330,11 +332,11 @@ export default function PatientRecords() {
                   </button>
                 </div>
 
-                {/* Latest Vitals Card*/}
+                {/* Latest Vitals Card - Show for all patients */}
                 <div className="mt-6 grid gap-4 md:grid-cols-3">
                   <div className="rounded-2xl border p-5" style={{ background: BRAND.bg, color: BRAND.text, borderColor: BRAND.border }}>
                     <div className="text-sm opacity-90">Heart Rate</div>
-                    <div className="mt-2 text-3xl font-extrabold tabular-nums">{latestVitals?.heartRate ?? '—'}</div>
+                    <div className="mt-2 text-3xl font-extrabold tabular-nums">{latestVitals?.heart_rate ?? '—'}</div>
                     <div className="mt-1 text-xs opacity-80">BPM</div>
                   </div>
                   <div className="rounded-2xl border p-5" style={{ background: BRAND.bg, color: BRAND.text, borderColor: BRAND.border }}>
@@ -344,14 +346,13 @@ export default function PatientRecords() {
                   </div>
                   <div className="rounded-2xl border p-5" style={{ background: BRAND.bg, color: BRAND.text, borderColor: BRAND.border }}>
                     <div className="text-sm opacity-90">SpO₂</div>
-                    <div className="mt-2 text-3xl font-extrabold tabular-nums">{latestVitals?.spo2 ?? '—'}</div>
+                    <div className="mt-2 text-3xl font-extrabold tabular-nums">{latestVitals?.oxygen_saturation ?? '—'}</div>
                     <div className="mt-1 text-xs opacity-80">%</div>
                   </div>
                 </div>
               </>
             ) : (
               <>
-                {/* Edit form */}
                 <GradientHeader icon={accIcon}>Personal Information</GradientHeader>
 
                 <div
@@ -362,12 +363,40 @@ export default function PatientRecords() {
                   <table className="min-w-full text-sm" style={{ background: BRAND.bg, color: BRAND.text }}>
                     <tbody>
                       <tr className="border-b" style={{ borderColor: BRAND.border }}>
-                        <th className="px-4 py-3 text-left w-52">Patient Name</th>
+                        <th className="px-4 py-3 text-left w-52">First Name</th>
                         <td className="px-4 py-3">
                           <input
-                            value={currentPatient.name || ''}
+                            value={currentPatient.first_name || ''}
                             onChange={(e) =>
-                              setCurrentPatient({ ...currentPatient, name: e.target.value })
+                              setCurrentPatient({ ...currentPatient, first_name: e.target.value })
+                            }
+                            className="w-full rounded-lg border px-3 py-2 bg-white"
+                            style={{ borderColor: BRAND.border }}
+                            required
+                          />
+                        </td>
+                        <th className="px-4 py-3 text-left w-40">Middle Initial</th>
+                        <td className="px-4 py-3">
+                          <input
+                            value={currentPatient.middle_initial || ''}
+                            onChange={(e) =>
+                              setCurrentPatient({ ...currentPatient, middle_initial: e.target.value })
+                            }
+                            maxLength={1}
+                            placeholder="Optional"
+                            className="w-full rounded-lg border px-3 py-2 bg-white"
+                            style={{ borderColor: BRAND.border }}
+                          />
+                        </td>
+                      </tr>
+
+                      <tr className="border-b" style={{ borderColor: BRAND.border }}>
+                        <th className="px-4 py-3 text-left">Last Name</th>
+                        <td className="px-4 py-3">
+                          <input
+                            value={currentPatient.last_name || ''}
+                            onChange={(e) =>
+                              setCurrentPatient({ ...currentPatient, last_name: e.target.value })
                             }
                             className="w-full rounded-lg border px-3 py-2 bg-white"
                             style={{ borderColor: BRAND.border }}
@@ -377,9 +406,9 @@ export default function PatientRecords() {
                         <th className="px-4 py-3 text-left w-40">Gender</th>
                         <td className="px-4 py-3">
                           <select
-                            value={currentPatient.gender || 'Male'}
+                            value={currentPatient.sex || 'Male'}
                             onChange={(e) =>
-                              setCurrentPatient({ ...currentPatient, gender: e.target.value })
+                              setCurrentPatient({ ...currentPatient, sex: e.target.value })
                             }
                             className="w-full rounded-lg border px-3 py-2 bg-white"
                             style={{ borderColor: BRAND.border }}
@@ -442,7 +471,6 @@ export default function PatientRecords() {
                   </table>
                 </div>
 
-                {/* Blood Pressure Input Section */}
                 <div className="mt-6">
                   <SectionHeader>Blood Pressure</SectionHeader>
                   <div className="mt-3 rounded-2xl border p-4 flex items-center gap-3"
@@ -466,7 +494,6 @@ export default function PatientRecords() {
                   </div>
                 </div>
 
-                {/* Vital Signs History */}
                 <GradientHeader icon={historyIcon}>Vital Signs History</GradientHeader>
                 <div
                   className="mt-3 rounded-2xl overflow-hidden border relative"
