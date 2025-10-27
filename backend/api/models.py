@@ -35,11 +35,13 @@ class Patient(models.Model):
         if not self.patient_id:
             today = timezone.now().date()
             yyyymmdd = today.strftime("%Y%m%d")
-            
-            # Count patients created today
             count_today = Patient.objects.filter(patient_id__startswith=f"P-{yyyymmdd}").count() + 1
             self.patient_id = f"P-{yyyymmdd}-{count_today:03d}"
-        super().save(*args, **kwargs)
+            
+          # NEW: set last_visit on first creation
+        if not self.last_visit:
+            self.last_visit = timezone.now()
+            super().save(*args, **kwargs)
 
     def is_senior(self):
         """Helper: Check if patient is senior (age >= 65)."""
@@ -82,7 +84,7 @@ class QueueEntry(models.Model):
         ordering = ['-entered_at']
     
     def save(self, *args, **kwargs):
-        # ✅ UPDATE LAST VISIT when entering queue
+        # UPDATE LAST VISIT when entering queue
         self.patient.last_visit = timezone.now()
         self.patient.save()
         

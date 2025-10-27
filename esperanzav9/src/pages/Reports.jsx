@@ -1,6 +1,6 @@
 // Reports.jsx - Connected to Database
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom' // ✅ Added useSearchParams
 import backIcon from '../assets/back.png'
 import accIcon from '../assets/account.png'
 import searchIcon from '../assets/search.png'
@@ -21,13 +21,35 @@ const calcAge = (dobStr) => {
 
 export default function Reports() {
   const nav = useNavigate()
-  const [query, setQuery] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams() // ✅ Add this
+  const [query, setQuery] = useState(searchParams.get('q') || '') // ✅ Initialize query from URL
   const [patients, setPatients] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetchPatients()
   }, [])
+
+  useEffect(() => {
+    // ✅ Whenever URL ?q changes, sync with the search box
+    const q = searchParams.get('q') || ''
+    setQuery(q)
+  }, [searchParams])
+
+  // ✅ Helper functions (place them anywhere inside the component)
+  const handleSearch = () => {
+    if (query.trim()) {
+      setSearchParams({ q: query.trim() })
+    } else {
+      setSearchParams({})
+    }
+  }
+
+  const handleClear = () => {
+    setQuery('')
+    setSearchParams({})
+  }
+  // ✅ End of helper functions
 
   const fetchPatients = async () => {
     setLoading(true)
@@ -137,6 +159,7 @@ export default function Reports() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()} // ✅ Uses helper
                 placeholder="Search name, ID, address or contact…"
                 className="w-full rounded-full px-4 py-2 outline-none shadow-inner pr-10"
                 style={{
@@ -151,6 +174,13 @@ export default function Reports() {
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 opacity-70 pointer-events-none"
               />
             </div>
+            {/* ✅ Optional Clear Button */}
+            <button
+              onClick={handleClear}
+              className="ml-2 rounded-full border border-slate-300 px-3 py-1 hover:bg-slate-100"
+            >
+              Clear
+            </button>
           </div>
         </div>
 

@@ -22,7 +22,7 @@ export default function Register() {
   const [last_name, setLastName] = useState('')
 
   const [age, setAge] = useState('')
-  const [gender, setGender] = useState('Male')
+  const [sex, setSex] = useState('Male')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
   const [month, setMonth] = useState(months[0])
@@ -75,7 +75,7 @@ export default function Register() {
     first_name: first_name.trim(),
     middle_initial: middle_initial.trim(),
     last_name: last_name.trim(),
-    gender: gender,
+    sex: sex,
     birthdate: dob,  // Uses the useMemo calculated value
     contact: phone.trim(),
     address: address.trim(),
@@ -182,13 +182,13 @@ export default function Register() {
                   </div>
                 </div>
 
-                {/* Gender / Birthdate */}
+                {/* Sex / Birthdate */}
                 <div className="grid md:grid-cols-3 gap-6">
                   <div>
-                    <label className="text-sm font-semibold text-slate-700">Gender</label>
+                    <label className="text-sm font-semibold text-slate-700">Sex</label>
                     <select
-                      value={gender}
-                      onChange={e=>setGender(e.target.value)}
+                      value={sex}
+                      onChange={e=>setSex(e.target.value)}
                       className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-2.5"
                     >
                       <option>Male</option>
