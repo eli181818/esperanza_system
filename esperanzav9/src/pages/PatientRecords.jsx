@@ -24,6 +24,8 @@ export default function PatientRecords() {
   const [latestVitals, setLatestVitals] = useState(null)
   const [history, setHistory] = useState([])
   const [bpInput, setBpInput] = useState('')
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [targetToDelete, setTargetToDelete] = useState(null)
 
   const constructName = (patient) => {
     if (patient.name) return patient.name
@@ -118,6 +120,79 @@ export default function PatientRecords() {
     setQuery('')
     setSearchParams({})
   }
+
+  // for delete
+  const handleDelete = (patient) => {
+    setTargetToDelete(patient)
+    setShowDeleteModal(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!targetToDelete) return
+    try {
+      const res = await fetch(`http://localhost:8000/patients/${targetToDelete.id}/`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+
+      if (!res.ok) {
+        throw new Error(`Delete failed (status ${res.status})`)
+      }
+
+      // Remove from list
+      setPatients((prev) => prev.filter((x) => x.id !== targetToDelete.id))
+
+      if (currentPatient?.id === targetToDelete.id) {
+        setEditing(false)
+        setCurrentPatient(null)
+        setLatestVitals(null)
+        setHistory([])
+      }
+
+      setShowDeleteModal(false)
+      setTargetToDelete(null)
+    } catch (e) {
+      console.error('Failed to delete patient:', e)
+      alert('Failed to delete patient.')
+    }
+  }
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false)
+    setTargetToDelete(null)
+  }
+
+  const fullName = constructName(patient);
+  const confirmed = window.confirm(`Delete patient "${fullName}" (ID: ${patient.patient_id})? This cannot be undone.`);
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch(`http://localhost:8000/patients/${patient.id}/`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+
+    if (!res.ok && res.status !== 204) {
+      throw new Error(`Delete failed (status ${res.status})`);
+    }
+
+    // Remove from the patient list
+    setPatients((prev) => prev.filter((x) => x.id !== patient.id));
+
+    if (currentPatient?.id === patient.id) {
+      setEditing(false);
+      setCurrentPatient(null);
+      setLatestVitals(null);
+      setHistory([]);
+    }
+
+    alert('Patient deleted successfully.');
+  } catch (err) {
+    console.error('Failed to delete patient:', err);
+    alert('Failed to delete patient.');
+    }
+  };
+
 
   const saveProfile = async () => {
     if (!currentPatient) return
@@ -323,12 +398,18 @@ export default function PatientRecords() {
                       Address: <span className="font-semibold">{p.address || '—'}</span>
                     </p>
                   </div>
-                  <button
-                    onClick={() => startEditing(p)}
-                    className="rounded-xl px-4 py-2 font-semibold text-white"
-                    style={{ background: BRAND.text }}
-                  >
-                    Edit
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => startEditing(p)}
+                      className="rounded-xl px-4 py-2 font-semibold text-white"
+                      style={{ background: BRAND.text }}>
+                      Edit
+                    </button>
+                    <button
+                    onClick={() => handleDelete(p)}
+                    className="rounded-xl px-4 py-2 font-semibold text-white transition-colors"
+                    style={{ backgroundColor: '#cb4c4e' }}>
+                    Delete
                   </button>
                 </div>
 
@@ -551,6 +632,33 @@ export default function PatientRecords() {
           </div>
         ))}
       </div>
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full text-center">
+            <h3 className="text-lg font-bold text-slate-800">
+              Delete “{targetToDelete ? constructName(targetToDelete) : 'this'}”
+              {targetToDelete?.patient_id ? ` (ID: ${targetToDelete.patient_id})` : ''}?
+            </h3>
+            <p className="text-sm text-slate-600 mt-2">This action cannot be undone.</p>
+            <div className="mt-6 flex justify-center gap-3">
+              <button
+                onClick={cancelDelete}
+                className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 rounded-xl text-white font-semibold"
+                style={{ backgroundColor: '#cb4c4e' }}
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
