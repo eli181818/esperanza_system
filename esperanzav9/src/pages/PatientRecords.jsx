@@ -24,8 +24,6 @@ export default function PatientRecords() {
   const [latestVitals, setLatestVitals] = useState(null)
   const [history, setHistory] = useState([])
   const [bpInput, setBpInput] = useState('')
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [targetToDelete, setTargetToDelete] = useState(null)
 
   const constructName = (patient) => {
     if (patient.name) return patient.name
@@ -65,10 +63,13 @@ export default function PatientRecords() {
   useEffect(() => {
     if (patients.length > 0 && !editing) {
       if (patientId) {
-        const patientToEdit = patients.find(p => p.patient_id === parseInt(patientId))
+        // FIXED: Search using the patient_id from URL
+        const patientToEdit = patients.find(p => p.patient_id === patientId)
         if (patientToEdit) {
+          // If found, treat it as starting an edit immediately
           startEditing(patientToEdit)
         } else {
+          // If not found (or patientId is just a placeholder), select the first one
           const firstPatient = patients[0]
           setCurrentPatient(firstPatient)
           fetchVitals(firstPatient.id)
@@ -76,7 +77,9 @@ export default function PatientRecords() {
       } else {
         const firstPatient = patients[0]
         setCurrentPatient(firstPatient)
-        fetchVitals(firstPatient.id)
+        if (firstPatient) {
+           fetchVitals(firstPatient.id)
+        }
       }
     } else if (patients.length === 0) {
       setCurrentPatient(null)
@@ -120,79 +123,6 @@ export default function PatientRecords() {
     setQuery('')
     setSearchParams({})
   }
-
-  // for delete
-  const handleDelete = (patient) => {
-    setTargetToDelete(patient)
-    setShowDeleteModal(true)
-  }
-
-  const confirmDelete = async () => {
-    if (!targetToDelete) return
-    try {
-      const res = await fetch(`http://localhost:8000/patients/${targetToDelete.id}/`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-
-      if (!res.ok) {
-        throw new Error(`Delete failed (status ${res.status})`)
-      }
-
-      // Remove from list
-      setPatients((prev) => prev.filter((x) => x.id !== targetToDelete.id))
-
-      if (currentPatient?.id === targetToDelete.id) {
-        setEditing(false)
-        setCurrentPatient(null)
-        setLatestVitals(null)
-        setHistory([])
-      }
-
-      setShowDeleteModal(false)
-      setTargetToDelete(null)
-    } catch (e) {
-      console.error('Failed to delete patient:', e)
-      alert('Failed to delete patient.')
-    }
-  }
-
-  const cancelDelete = () => {
-    setShowDeleteModal(false)
-    setTargetToDelete(null)
-  }
-
-  const fullName = constructName(patient);
-  const confirmed = window.confirm(`Delete patient "${fullName}" (ID: ${patient.patient_id})? This cannot be undone.`);
-  if (!confirmed) return;
-
-  try {
-    const res = await fetch(`http://localhost:8000/patients/${patient.id}/`, {
-      method: 'DELETE',
-      credentials: 'include',
-    });
-
-    if (!res.ok && res.status !== 204) {
-      throw new Error(`Delete failed (status ${res.status})`);
-    }
-
-    // Remove from the patient list
-    setPatients((prev) => prev.filter((x) => x.id !== patient.id));
-
-    if (currentPatient?.id === patient.id) {
-      setEditing(false);
-      setCurrentPatient(null);
-      setLatestVitals(null);
-      setHistory([]);
-    }
-
-    alert('Patient deleted successfully.');
-  } catch (err) {
-    console.error('Failed to delete patient:', err);
-    alert('Failed to delete patient.');
-    }
-  };
-
 
   const saveProfile = async () => {
     if (!currentPatient) return
@@ -254,7 +184,7 @@ export default function PatientRecords() {
       setEditing(false)
       
       const currentSearch = searchParams.get('q') || ''
-      fetchPatients(currentSearch)
+      fetchPatients(currentSearch) // Refresh list to reflect changes
     } catch (err) {
       console.error('Failed to save:', err)
       alert(`Failed to save record: ${err.message}`)
@@ -285,14 +215,20 @@ export default function PatientRecords() {
     }
   }
 
-  const handleFinish = () => {
-    saveProfile()
+  const handleFinish = async () => {
+    // Await saveProfile to ensure update is done before state reset/navigation
+    await saveProfile()
+    
+    // Reset editing state and navigate back to the search view
+    setEditing(false)
+    setCurrentPatient(null)
     const currentSearch = searchParams.get('q')
     if (currentSearch) {
       nav(`/staff/patient-records?q=${encodeURIComponent(currentSearch)}`, { replace: true })
     } else {
       nav('/staff/patient-records', { replace: true })
     }
+    // fetchPatients is already called inside saveProfile upon success
   }
 
   const startEditing = (patient) => {
@@ -301,7 +237,7 @@ export default function PatientRecords() {
       first_name: patient.first_name || '',
       middle_initial: patient.middle_initial || '',
       last_name: patient.last_name || '',
-      sex: patient.sex || patient.gender || 'Male',
+      sex: patient.sex || patient.sex || 'Male',
       birthdate: patient.birthdate || patient.dob || '',
     }
     
@@ -311,6 +247,7 @@ export default function PatientRecords() {
     // Fetch vitals for this patient
     fetchVitals(patient.id)
     
+    // Update URL to reflect editing state
     const currentSearch = searchParams.get('q')
     if (currentSearch) {
       nav(`/staff/patient-records/${patient.patient_id}?q=${encodeURIComponent(currentSearch)}`, { replace: true })
@@ -347,6 +284,70 @@ export default function PatientRecords() {
       {children}
     </div>
   )
+
+  // Delete Modal State and Handlers
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [targetPatientId, setTargetPatientId] = useState(null); // Changed to targetPatientId
+
+  // NEW: API call to delete the patient
+  const deletePatient = async (patientDbId) => {
+    try {
+      const res = await fetch(`http://localhost:8000/patients/${patientDbId}/`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to delete patient record');
+      }
+      
+      alert('Patient record deleted successfully.');
+    } catch (e) {
+      console.error('Failed to delete patient data:', e);
+      alert(`Failed to delete record: ${e.message}`);
+      throw e; // Re-throw to prevent confirmDelete from proceeding
+    }
+  };
+
+  const handleDeleteClick = (databaseId) => { // Use database ID for API
+    setTargetPatientId(databaseId);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!targetPatientId) return;
+
+    try {
+      await deletePatient(targetPatientId);
+      
+      // Clean up local state after successful deletion
+      setCurrentPatient(null);
+      setLatestVitals(null);
+      setHistory([]);
+      setEditing(false);
+      
+      // Refresh patient list from the server
+      fetchPatients(query.trim());
+
+      // Reset modal state
+      setShowDeleteModal(false);
+      setTargetPatientId(null);
+      
+      // Navigate back to the main list view
+      nav('/staff/patient-records', { replace: true });
+    } catch (e) {
+      // The error is already alerted in deletePatient
+      setShowDeleteModal(false);
+      setTargetPatientId(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setTargetPatientId(null);
+  };
+  
+    // End Delete Modal Handlers
 
   return (
     <section className="relative mx-auto max-w-5xl px-2 py-16">
@@ -398,36 +399,42 @@ export default function PatientRecords() {
                       Address: <span className="font-semibold">{p.address || '—'}</span>
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex gap-3"> {/* Group buttons */}
                     <button
                       onClick={() => startEditing(p)}
                       className="rounded-xl px-4 py-2 font-semibold text-white"
-                      style={{ background: BRAND.text }}>
+                      style={{ background: BRAND.text }}
+                    >
                       Edit
                     </button>
+
+                    {/* Delete Button - Pass the database ID (p.id) */}
                     <button
-                    onClick={() => handleDelete(p)}
-                    className="rounded-xl px-4 py-2 font-semibold text-white transition-colors"
-                    style={{ backgroundColor: '#cb4c4e' }}>
-                    Delete
-                  </button>
+                      onClick={() => handleDeleteClick(p.id)} 
+                      className="rounded-xl px-4 py-2 font-semibold text-white transition-colors"
+                      style={{ backgroundColor: '#cb4c4e' }}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
 
                 {/* Latest Vitals Card - Show for all patients */}
+                {/* NOTE: latestVitals will only be correct for the currentPatient */}
                 <div className="mt-6 grid gap-4 md:grid-cols-3">
                   <div className="rounded-2xl border p-5" style={{ background: BRAND.bg, color: BRAND.text, borderColor: BRAND.border }}>
                     <div className="text-sm opacity-90">Heart Rate</div>
-                    <div className="mt-2 text-3xl font-extrabold tabular-nums">{latestVitals?.heart_rate ?? '—'}</div>
+                    <div className="mt-2 text-3xl font-extrabold tabular-nums">{p.latest_vitals?.heart_rate ?? '—'}</div>
                     <div className="mt-1 text-xs opacity-80">BPM</div>
                   </div>
                   <div className="rounded-2xl border p-5" style={{ background: BRAND.bg, color: BRAND.text, borderColor: BRAND.border }}>
                     <div className="text-sm opacity-90">Temperature</div>
-                    <div className="mt-2 text-3xl font-extrabold tabular-nums">{latestVitals?.temperature ?? '—'}</div>
+                    <div className="mt-2 text-3xl font-extrabold tabular-nums">{p.latest_vitals?.temperature ?? '—'}</div>
                     <div className="mt-1 text-xs opacity-80">°C</div>
                   </div>
                   <div className="rounded-2xl border p-5" style={{ background: BRAND.bg, color: BRAND.text, borderColor: BRAND.border }}>
                     <div className="text-sm opacity-90">SpO₂</div>
-                    <div className="mt-2 text-3xl font-extrabold tabular-nums">{latestVitals?.oxygen_saturation ?? '—'}</div>
+                    <div className="mt-2 text-3xl font-extrabold tabular-nums">{p.latest_vitals?.oxygen_saturation ?? '—'}</div>
                     <div className="mt-1 text-xs opacity-80">%</div>
                   </div>
                 </div>
@@ -484,7 +491,7 @@ export default function PatientRecords() {
                             required
                           />
                         </td>
-                        <th className="px-4 py-3 text-left w-40">Gender</th>
+                        <th className="px-4 py-3 text-left w-40">Sex</th>
                         <td className="px-4 py-3">
                           <select
                             value={currentPatient.sex || 'Male'}
@@ -552,6 +559,7 @@ export default function PatientRecords() {
                   </table>
                 </div>
 
+                {/* Blood Pressure Input (for staff) */}
                 <div className="mt-6">
                   <SectionHeader>Blood Pressure</SectionHeader>
                   <div className="mt-3 rounded-2xl border p-4 flex items-center gap-3"
@@ -575,6 +583,7 @@ export default function PatientRecords() {
                   </div>
                 </div>
 
+                {/* Vital Signs History */}
                 <GradientHeader icon={historyIcon}>Vital Signs History</GradientHeader>
                 <div
                   className="mt-3 rounded-2xl overflow-hidden border relative"
@@ -632,33 +641,36 @@ export default function PatientRecords() {
           </div>
         ))}
       </div>
+
+      
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full text-center">
-            <h3 className="text-lg font-bold text-slate-800">
-              Delete “{targetToDelete ? constructName(targetToDelete) : 'this'}”
-              {targetToDelete?.patient_id ? ` (ID: ${targetToDelete.patient_id})` : ''}?
-            </h3>
-            <p className="text-sm text-slate-600 mt-2">This action cannot be undone.</p>
-            <div className="mt-6 flex justify-center gap-3">
-              <button
-                onClick={cancelDelete}
-                className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-4 py-2 rounded-xl text-white font-semibold"
-                style={{ backgroundColor: '#cb4c4e' }}
-              >
-                Yes, Delete
-              </button>
-            </div>
+      <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full text-center">
+          <h3 className="text-lg font-bold text-slate-800">
+            Are you sure you want to delete this record?
+          </h3>
+          <p className="text-sm text-slate-600 mt-2">
+            This action cannot be undone.
+          </p>
+          <div className="mt-6 flex justify-center gap-3">
+            <button
+              onClick={cancelDelete}
+              className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmDelete}
+              className="px-4 py-2 rounded-xl text-white font-semibold"
+              style={{ backgroundColor: '#cb4c4e' }}
+            >
+              Yes, Delete
+            </button>
           </div>
         </div>
-      )}
+      </div>
+    )}
     </section>
   )
 }
