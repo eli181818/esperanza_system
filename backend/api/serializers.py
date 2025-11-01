@@ -15,11 +15,6 @@ class PatientSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Contact number must be exactly 11 digits.")
         return value
     
-    def validate_age(self, value):
-        if value <= 0:
-            raise serializers.ValidationError("Age must be greater than")
-        return value
-    
     def validate_birthdate(self, value):
         if value > date.today():
             raise serializers.ValidationError("Birthdate cannot be in the future.")

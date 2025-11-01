@@ -9,36 +9,37 @@ class HCStaff(models.Model):
 
 class Patient(models.Model):    
     patient_id = models.CharField(max_length=15, unique=True)
-    first_name = models.CharField(max_length=100)
+    first_name = models.CharField(max_length=50)
     middle_initial = models.CharField(max_length=1, null=True, blank=True)
     last_name = models.CharField(max_length=50)
-    age = models.IntegerField(null=True, blank=True)
     sex = models.CharField(max_length=6, choices=[('Male', 'Male'), ('Female', 'Female')])
     contact = models.CharField(max_length=11, default='N/A')
-    address = models.TextField(max_length=450)
-    username = models.CharField(max_length=50, null=True, blank=True, unique=True)
+    address = models.TextField(max_length=300)
+    username = models.CharField(max_length=20, null=True, blank=True, unique=True)
     birthdate = models.DateField(null=True, blank=True)
     pin = models.CharField(max_length=4)
     fingerprint_id = models.CharField(max_length=4, null=True, blank=True, unique=True)
     last_visit = models.DateTimeField(null=True, blank=True)
-
-    def save(self, *args, **kwargs):  # Calculate age
+    
+    @property
+    def age(self):
+        """Calculates age based on birthdate and today's date."""
         if self.birthdate:
             today = date.today()
-            calculated_age = today.year - self.birthdate.year
-            
-            # Adjust if birthday hasn't happened yet this year
-            if (today.month, today.day) < (self.birthdate.month, self.birthdate.day):
-                calculated_age -= 1
-            self.age = calculated_age
-            
+            # Calculate the age: today.year - birthdate.year
+            # Subtract 1 if the current date is before the birthday this year
+            return today.year - self.birthdate.year - ((today.month, today.day) < (self.birthdate.month, self.birthdate.day))
+        return None
+
+    def save(self, *args, **kwargs):  
         if not self.patient_id:
             today = timezone.now().date()
             yyyymmdd = today.strftime("%Y%m%d")
             count_today = Patient.objects.filter(patient_id__startswith=f"P-{yyyymmdd}").count() + 1
             self.patient_id = f"P-{yyyymmdd}-{count_today:03d}"
+            pass
             
-          # NEW: set last_visit on first creation
+          # set last_visit on first creation
         if not self.last_visit:
             self.last_visit = timezone.now()
             super().save(*args, **kwargs)

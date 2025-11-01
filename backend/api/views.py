@@ -130,7 +130,7 @@ def receive_vital_signs(request):  # FOR RPi
             # Add BP if implemented: blood_pressure_systolic=data.get('systolic'), etc.
         )
         
-        # ✅ UPDATE LAST VISIT
+        # UPDATE LAST VISIT
         patient.last_visit = timezone.now()
         patient.save()
         

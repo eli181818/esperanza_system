@@ -53,10 +53,12 @@ export default function LoginAuth() {
       if (userData.role === 'patient') {
         sessionStorage.setItem('patientName', userData.name)
         sessionStorage.setItem('isAuthenticated', 'true')
+        sessionStorage.setItem('userRole', 'patient');
         nav('/portal')
       } else if (userData.role === 'staff') {
         sessionStorage.setItem('staffName', userData.name)
         sessionStorage.setItem('isAuthenticated', 'true')
+        sessionStorage.setItem('userRole', 'staff');
         nav('/staff')
       }
       
