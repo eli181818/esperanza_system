@@ -8,7 +8,7 @@ import ResultCard from '../../components/ResultCard';
 import { initModalDelay, SESSION_KEYS } from './utils';
 import TemperaturePic from '../../assets/temperature.png';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://192.168.1.31:8000';
 
 export default function Temperature() {
   const nav = useNavigate();
